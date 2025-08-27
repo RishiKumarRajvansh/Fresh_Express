@@ -1,0 +1,314 @@
+{% extends "accounts/auth_base.html" %}
+{% load static %}
+
+{% block title %}Phone Registration{% endblock %}
+
+{% block extra_css %}
+<style>
+.auth-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.auth-card {
+    background: white;
+    border-radius: 20px;
+    padding: 3rem;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 450px;
+    text-align: center;
+}
+
+.auth-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.auth-subtitle {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.form-control-custom {
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 1rem;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+}
+
+.form-control-custom:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.phone-input {
+    position: relative;
+    margin-bottom: 1.5rem;
+}
+
+.phone-prefix {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #666;
+    font-weight: 500;
+}
+
+.phone-input .form-control-custom {
+    padding-left: 4rem;
+}
+
+.btn-primary-custom {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+.btn-primary-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+}
+
+.otp-inputs {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+}
+
+.otp-input {
+    width: 50px;
+    height: 50px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.otp-input:focus {
+    border-color: #10b981;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.resend-otp {
+    color: #10b981;
+    text-decoration: none;
+    font-weight: 500;
+    margin-top: 1rem;
+    display: inline-block;
+}
+
+.resend-otp:hover {
+    text-decoration: underline;
+}
+
+.auth-links {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.auth-links a {
+    color: #10b981;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
+
+.step-indicator {
+    margin-bottom: 2rem;
+}
+
+.step {
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #999;
+    line-height: 30px;
+    margin: 0 10px;
+}
+
+.step.active {
+    background: #10b981;
+    color: white;
+}
+
+.step.completed {
+    background: #059669;
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h1 class="auth-title">📱 Create Account</h1>
+        <p class="auth-subtitle">Register with your phone number</p>
+        
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+            <span class="step {% if not step or step == 'details' %}active{% else %}completed{% endif %}">1</span>
+            <span class="step {% if step == 'otp' %}active{% endif %}">2</span>
+        </div>
+        
+        <!-- Error Message Display -->
+        {% if error_message %}
+        <div class="alert alert-warning alert-dismissible fade show" role="alert" style="background-color: #fef3c7; border-color: #f59e0b; color: #92400e; margin-bottom: 1.5rem; border-radius: 12px;">
+            <i class="fas fa-exclamation-triangle"></i> {{ error_message }}
+        </div>
+        {% endif %}
+
+        <form method="post" id="phoneRegisterForm">
+            {% csrf_token %}
+            
+            {% if not step or step == 'details' %}
+                <!-- Registration Details Step -->
+                <input type="hidden" name="step" value="details">
+                
+                <input type="text" name="name" class="form-control form-control-custom" 
+                       placeholder="Full Name" required>
+                
+                <input type="email" name="email" class="form-control form-control-custom" 
+                       placeholder="Email Address" required>
+                
+                <div class="phone-input">
+                    <span class="phone-prefix">+91</span>
+                    <input type="text" name="phone_number" class="form-control form-control-custom" 
+                           placeholder="Phone Number" maxlength="10" pattern="[0-9]{10}" 
+                           {% if suggested_phone %}value="{{ suggested_phone }}"{% endif %} required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary-custom">
+                    <i class="fas fa-paper-plane"></i> Send OTP
+                </button>
+            {% else %}
+                <!-- OTP Verification Step -->
+                <input type="hidden" name="step" value="otp">
+                <input type="hidden" name="phone_number" value="{{ phone_number }}">
+                
+                <p class="text-muted mb-3">Enter the 6-digit OTP sent to +91 {{ phone_number }}</p>
+                
+                <div class="otp-inputs">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]">
+                    <input type="text" class="otp-input" maxlength="1" pattern="[0-9]">
+                </div>
+                
+                <input type="hidden" name="otp_code" id="otpCode">
+                
+                <button type="submit" class="btn btn-primary-custom">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+                
+                <a href="#" class="resend-otp" id="resendOTP">Resend OTP</a>
+            {% endif %}
+        </form>
+
+        <div class="auth-links">
+            <p>Already have an account? <a href="{% url 'accounts:phone_login' %}">Login with Phone</a></p>
+            <p>Business User? <a href="{% url 'accounts:business_register' %}">Join Our Business Network</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Phone number formatting
+    const phoneInput = document.querySelector('input[name="phone_number"]');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            e.target.value = e.target.value.replace(/\D/g, '');
+        });
+    }
+
+    // OTP input handling
+    const otpInputs = document.querySelectorAll('.otp-input');
+    const otpCodeInput = document.getElementById('otpCode');
+    
+    if (otpInputs.length > 0) {
+        otpInputs.forEach((input, index) => {
+            input.addEventListener('input', function(e) {
+                e.target.value = e.target.value.replace(/\D/g, '');
+                
+                // Auto-move to next input
+                if (e.target.value && index < otpInputs.length - 1) {
+                    otpInputs[index + 1].focus();
+                }
+                
+                // Update hidden OTP code
+                updateOTPCode();
+            });
+            
+            input.addEventListener('keydown', function(e) {
+                // Move to previous input on backspace
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                    otpInputs[index - 1].focus();
+                }
+            });
+        });
+        
+        function updateOTPCode() {
+            const otp = Array.from(otpInputs).map(input => input.value).join('');
+            if (otpCodeInput) {
+                otpCodeInput.value = otp;
+            }
+        }
+    }
+
+    // Resend OTP
+    const resendBtn = document.getElementById('resendOTP');
+    if (resendBtn) {
+        resendBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const phoneNumber = document.querySelector('input[name="phone_number"]').value;
+            
+            fetch('{% url "accounts:resend_otp" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: 'phone_number=' + phoneNumber
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear OTP inputs
+                    otpInputs.forEach(input => input.value = '');
+                    otpInputs[0].focus();
+                } else {
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

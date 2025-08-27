@@ -1,0 +1,127 @@
+{% extends 'base_mobile.html' %}
+{% load static %}
+
+{% block title %}Mobile Login - Fresh Meat & Seafood{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row min-vh-100">
+        <!-- Left side - Brand/Image -->
+        <div class="col-lg-6 d-none d-lg-flex align-items-center justify-content-center bg-success text-white">
+            <div class="text-center">
+                <h1 class="display-4 fw-bold mb-4">🥩 Fresh Meat & Seafood</h1>
+                <p class="lead mb-4">Fresh groceries delivered to your doorstep in Delhi</p>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h3>🚀</h3>
+                        <p>30-min delivery</p>
+                    </div>
+                    <div class="col-4">
+                        <h3>💰</h3>
+                        <p>Best prices</p>
+                    </div>
+                    <div class="col-4">
+                        <h3>✨</h3>
+                        <p>Fresh quality</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right side - Login Form -->
+        <div class="col-lg-6 d-flex align-items-center justify-content-center">
+            <div class="w-100" style="max-width: 400px;">
+                <div class="card shadow border-0">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <h2 class="fw-bold text-success">Welcome Back!</h2>
+                            <p class="text-muted">Enter your mobile number to continue</p>
+                        </div>
+                        
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Mobile Number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">🇮🇳 +91</span>
+                                    {{ form.mobile_number }}
+                                </div>
+                                {% if form.mobile_number.errors %}
+                                    <div class="text-danger mt-2">
+                                        {% for error in form.mobile_number.errors %}
+                                            <small>{{ error }}</small>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <small class="form-text text-muted">
+                                    We'll send you an OTP to verify your number
+                                </small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100 py-3 mb-3">
+                                <i class="fas fa-mobile-alt me-2"></i>Send OTP
+                            </button>
+                        </form>
+                        
+                        <div class="text-center">
+                            <p class="text-muted mb-2">Having trouble?</p>
+                            <a href="{% url 'accounts:login' %}" class="text-success">
+                                <i class="fas fa-key me-1"></i>Use username & password instead
+                            </a>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <div class="text-center">
+                            <p class="text-muted mb-2">New to Fresh Meat & Seafood?</p>
+                            <a href="{% url 'accounts:register' %}" class="btn btn-outline-success w-100">
+                                <i class="fas fa-user-plus me-2"></i>Create Account
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <small class="text-muted">
+                        By continuing, you agree to our 
+                        <a href="{% url 'core:terms' %}" class="text-success">Terms & Conditions</a> 
+                        and 
+                        <a href="{% url 'core:privacy' %}" class="text-success">Privacy Policy</a>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .min-vh-100 {
+        min-height: 100vh;
+    }
+    
+    .card {
+        border-radius: 15px;
+    }
+    
+    .input-group-text {
+        border-right: none;
+        background-color: #f8f9fa;
+    }
+    
+    .form-control {
+        border-left: none;
+        border-radius: 0 8px 8px 0;
+    }
+    
+    .form-control:focus {
+        box-shadow: none;
+        border-color: #198754;
+    }
+    
+    .btn {
+        border-radius: 8px;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
