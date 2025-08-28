@@ -80,7 +80,7 @@ class UserTypeAccessMiddleware:
                         if user_type in ['store_owner', 'store_staff']:
                             return redirect('stores:dashboard')
                         elif user_type == 'delivery_agent':
-                            return redirect('delivery:dashboard') 
+                            return redirect('delivery:agent_dashboard') 
                         elif user_type == 'admin':
                             return redirect('/admin/')
                     

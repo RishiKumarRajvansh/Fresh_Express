@@ -49,7 +49,57 @@
             <div class="col-md-6 mb-3">
                 <div class="card">
                     <div class="card-body">
-                        <h6 class="card-title">{{ product.product.name }}</h6>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-0">{{ product.product.name }}</h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="{% url 'stores:edit_product' product.id %}">
+                                        <i class="fas fa-edit me-2"></i>Edit
+                                    </a></li>
+                                    <li><a class="dropdown-item text-danger" href="{% url 'stores:delete_product' product.id %}">
+                                        <i class="fas fa-trash me-2"></i>Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Product image carousel (show up to 5 images) -->
+                        {% with images=product.product.all_images|slice:":5" %}
+                        <div id="productCarousel-{{ product.id }}" class="carousel slide mb-3" data-bs-ride="carousel">
+                            <div class="carousel-inner" style="height:180px;">
+                                {% if images %}
+                                    {% for img in images %}
+                                    <div class="carousel-item {% if forloop.first %}active{% endif %}">
+                                        {% if img %}
+                                            <img src="{{ img.url }}" class="d-block w-100" alt="{{ product.product.name }}" style="height:180px; object-fit:cover;">
+                                        {% else %}
+                                            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='100%' height='100%' fill='%23f8f9fa'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-family='Arial, sans-serif' font-size='20'>No image</text></svg>" class="d-block w-100" alt="No image" style="height:180px; object-fit:cover;">
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="carousel-item active">
+                                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='100%' height='100%' fill='%23f8f9fa'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-family='Arial, sans-serif' font-size='20'>No image</text></svg>" class="d-block w-100" alt="No image" style="height:180px; object-fit:cover;">
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            {% if images and images|length > 1 %}
+                            <button class="carousel-control-prev" type="button" data-bs-target="#productCarousel-{{ product.id }}" data-bs-slide="prev">
+                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Previous</span>
+                            </button>
+                            <button class="carousel-control-next" type="button" data-bs-target="#productCarousel-{{ product.id }}" data-bs-slide="next">
+                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                <span class="visually-hidden">Next</span>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endwith %}
+
                         <p class="text-muted mb-2">{{ product.product.category.name }}</p>
                         <p class="mb-2">
                             <strong>Stock: </strong>
@@ -65,6 +115,9 @@
                             <span class="badge bg-{% if product.is_available %}success{% else %}danger{% endif %}">
                                 {% if product.is_available %}Available{% else %}Unavailable{% endif %}
                             </span>
+                            {% if product.is_featured %}
+                                <span class="badge bg-warning ms-1">Featured</span>
+                            {% endif %}
                         </p>
                     </div>
                 </div>
@@ -112,16 +165,14 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="productCategory" class="form-label">Category</label>
-                                <select class="form-control" id="productCategory" name="category">
+                                <label for="productCategory" class="form-label">Category *</label>
+                                <select class="form-control" id="productCategory" name="category" required>
                                     <option value="">Select Category</option>
-                                    <option value="meat">Fresh Meat</option>
-                                    <option value="seafood">Seafood</option>
-                                    <option value="frozen">Frozen Items</option>
-                                    <option value="dairy">Dairy Products</option>
-                                    <option value="vegetables">Vegetables</option>
-                                    <option value="spices">Spices & Seasonings</option>
+                                    {% for category in categories %}
+                                        <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
                                 </select>
+                                <small class="form-text text-muted">Categories are managed by admin</small>
                             </div>
                         </div>
                     </div>
@@ -156,9 +207,12 @@
                         <textarea class="form-control" id="productDescription" name="description" rows="3"></textarea>
                     </div>
                     <div class="mb-3">
-                        <label for="productImage" class="form-label">Product Image</label>
-                        <input type="file" class="form-control" id="productImage" name="image" accept="image/*">
-                        <small class="form-text text-muted">Optional: Upload product image (JPG, PNG)</small>
+                        <label for="productImages" class="form-label">Product Images *</label>
+                        <input type="file" class="form-control" id="productImages" name="images" accept="image/*" multiple required>
+                        <small class="form-text text-muted">Upload 1-5 product images (JPG, PNG). First image will be the main image.</small>
+                        <div id="imagePreview" class="mt-2" style="display: none;">
+                            <div class="row" id="previewContainer"></div>
+                        </div>
                     </div>
                     <div class="form-check">
                         <input type="checkbox" class="form-check-input" id="productAvailable" name="is_available" checked>
@@ -182,6 +236,66 @@
 
 {% block extra_js %}
 <script>
+// Image preview and validation
+document.getElementById('productImages').addEventListener('change', function(e) {
+    const files = e.target.files;
+    const previewContainer = document.getElementById('previewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    
+    // Clear previous previews
+    previewContainer.innerHTML = '';
+    
+    if (files.length === 0) {
+        imagePreview.style.display = 'none';
+        return;
+    }
+    
+    // Validate file count
+    if (files.length > 5) {
+        alert('You can upload maximum 5 images');
+        e.target.value = '';
+        imagePreview.style.display = 'none';
+        return;
+    }
+    
+    // Show preview
+    imagePreview.style.display = 'block';
+    
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            alert('Please select only image files');
+            e.target.value = '';
+            imagePreview.style.display = 'none';
+            return;
+        }
+        
+        // Validate file size (max 5MB per image)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('Each image must be less than 5MB');
+            e.target.value = '';
+            imagePreview.style.display = 'none';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const col = document.createElement('div');
+            col.className = 'col-md-2 col-4 mb-2';
+            col.innerHTML = `
+                <div class="position-relative">
+                    <img src="${e.target.result}" class="img-thumbnail" style="width: 100%; height: 80px; object-fit: cover;">
+                    ${i === 0 ? '<small class="badge bg-primary">Main</small>' : ''}
+                </div>
+            `;
+            previewContainer.appendChild(col);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
 // Handle add product form submission
 document.getElementById('addProductForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -211,6 +325,7 @@ document.getElementById('addProductForm').addEventListener('submit', function(e)
     })
     .catch(error => {
         console.error('Error:', error);
+        alert('Failed to add product. Please try again.');
     })
     .finally(() => {
         // Reset button state

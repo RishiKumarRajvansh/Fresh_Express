@@ -59,21 +59,21 @@ class HomeView(TemplateView):
                         availability_status='in_stock'
                     ).select_related('product', 'product__category', 'store').order_by('-created_at')[:8]
                     
-                    # Get best sellers (can be based on order frequency, for now just featured)
+                    # Get best sellers - first try featured products, then fall back to any available
                     best_sellers = StoreProduct.objects.filter(
                         store=best_store,
                         is_available=True,
                         availability_status='in_stock',
                         is_featured=True
-                    ).select_related('product', 'product__category', 'store').order_by('-product__name')[:8]
+                    ).select_related('product', 'product__category', 'store').order_by('-updated_at')[:8]
                     
-                    # If no best sellers, fallback to any available products
+                    # If no featured products, get any available products as best sellers
                     if not best_sellers:
                         best_sellers = StoreProduct.objects.filter(
                             store=best_store,
                             is_available=True,
                             availability_status='in_stock'
-                        ).select_related('product', 'product__category', 'store')[:8]
+                        ).select_related('product', 'product__category', 'store').order_by('-updated_at')[:8]
                     
                     # Get all active categories for now (simplified)
                     categories = Category.objects.filter(
@@ -106,12 +106,32 @@ class HomeView(TemplateView):
                         'next_delivery_slot': self.get_next_delivery_slot(best_store, zip_area),
                     })
                 else:
-                    # No store serves this ZIP
-                    context['no_service'] = True
-                    context['zip_area'] = zip_area
+                    # No store serves this ZIP - show empty state
+                    context.update({
+                        'no_service': True,
+                        'zip_area': zip_area,
+                        'fresh_arrivals': [],
+                        'best_sellers': [],
+                        'featured_products': [],
+                        'categories': Category.objects.filter(is_active=True, parent__isnull=True).order_by('sort_order')[:8],
+                    })
                     
             except ZipArea.DoesNotExist:
-                context['invalid_zip'] = True
+                context.update({
+                    'invalid_zip': True,
+                    'fresh_arrivals': [],
+                    'best_sellers': [],
+                    'featured_products': [],
+                    'categories': Category.objects.filter(is_active=True, parent__isnull=True).order_by('sort_order')[:8],
+                })
+        else:
+            # No ZIP selected - show empty state
+            context.update({
+                'fresh_arrivals': [],
+                'best_sellers': [],
+                'featured_products': [],
+                'categories': Category.objects.filter(is_active=True, parent__isnull=True).order_by('sort_order')[:8],
+            })
         
         return context
     
@@ -123,8 +143,8 @@ class HomeView(TemplateView):
         3. Store with best delivery time/rating (can be enhanced)
         """
         available_stores = Store.objects.filter(
-            storezipcoverage__zip_area=zip_area,
-            storezipcoverage__is_active=True,
+            zip_coverages__zip_area=zip_area,
+            zip_coverages__is_active=True,
             is_active=True,
             status='open'
         ).select_related().order_by('name')  # Can add ordering by rating, delivery time, etc.

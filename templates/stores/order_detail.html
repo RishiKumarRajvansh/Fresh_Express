@@ -381,28 +381,58 @@ function printHandoverCode(handoverCode, orderNumber) {
 
 function updateOrderStatus(status) {
     const form = document.getElementById('updateStatusForm');
+    if (!form) return;
     const statusSelect = document.getElementById('status');
-    statusSelect.value = status;
+    if (statusSelect) statusSelect.value = status;
     
     // Submit form via AJAX
     const formData = new FormData(form);
-    
+
+    // CSRF helper
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken = (csrfEl && csrfEl.value) || getCookie('csrftoken') || '{{ csrf_token }}';
+    // Debug: log outgoing request details
+    try { console.debug('updateOrderStatus ->', { action: form.action, order_id: formData.get('order_id'), status: formData.get('status'), csrfToken: csrfToken ? '[present]' : '[missing]' }); } catch(e){}
+
     fetch(form.action, {
         method: 'POST',
+        credentials: 'same-origin',
         body: formData,
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': csrfToken
         }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-                        location.reload();
+                        // show success in debug panel and reload
+                        const dbg = document.getElementById('ajaxDebug');
+                        if (dbg) dbg.textContent = JSON.stringify(data);
+                        setTimeout(() => location.reload(), 800);
         } else {
+            const dbg = document.getElementById('ajaxDebug');
+            if (dbg) dbg.textContent = JSON.stringify(data);
         }
     })
     .catch(error => {
         console.error('Error:', error);
+        const dbg = document.getElementById('ajaxDebug');
+        if (dbg) dbg.textContent = String(error);
     });
 }
 
@@ -411,12 +441,33 @@ document.getElementById('updateStatusForm').addEventListener('submit', function(
     e.preventDefault();
     
     const formData = new FormData(this);
-    
+    // CSRF helper for submit handler
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const csrfEl2 = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfToken2 = (csrfEl2 && csrfEl2.value) || getCookie('csrftoken') || '{{ csrf_token }}';
+
+    try { console.debug('submit updateStatusForm ->', { action: this.action, order_id: formData.get('order_id'), status: formData.get('status'), csrf: csrfToken2 ? '[present]' : '[missing]' }); } catch(e){}
+
     fetch(this.action, {
         method: 'POST',
+        credentials: 'same-origin',
         body: formData,
         headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            'X-CSRFToken': csrfToken2
         }
     })
     .then(response => response.json())
@@ -430,5 +481,27 @@ document.getElementById('updateStatusForm').addEventListener('submit', function(
         console.error('Error:', error);
     });
 });
+
+// Visible debug panel so store managers can copy the last AJAX response
+(function createDebugPanel(){
+    try{
+        var dbg = document.createElement('pre');
+        dbg.id = 'ajaxDebug';
+        dbg.style.position = 'fixed';
+        dbg.style.right = '10px';
+        dbg.style.bottom = '10px';
+        dbg.style.background = 'rgba(0,0,0,0.9)';
+        dbg.style.color = '#fff';
+        dbg.style.padding = '8px';
+        dbg.style.zIndex = '99999';
+        dbg.style.maxWidth = '400px';
+        dbg.style.maxHeight = '200px';
+        dbg.style.overflow = 'auto';
+        dbg.style.fontSize = '12px';
+        dbg.style.borderRadius = '6px';
+        dbg.textContent = 'AJAX debug panel: awaiting actions...';
+        document.body.appendChild(dbg);
+    }catch(e){}
+})();
 </script>
 {% endblock %}

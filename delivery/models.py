@@ -4,6 +4,7 @@ from decimal import Decimal
 from core.models import TimeStampedModel
 from stores.models import Store
 from orders.models import Order
+from locations.models import ZipArea
 import uuid
 
 User = get_user_model()
@@ -216,3 +217,22 @@ class DeliveryZone(TimeStampedModel):
     class Meta:
         unique_together = ['store', 'name']
         ordering = ['priority_level', 'name']
+
+
+class DeliveryAgentZipCoverage(TimeStampedModel):
+    """Manages which ZIP areas a delivery agent can serve"""
+    
+    agent = models.ForeignKey(DeliveryAgent, on_delete=models.CASCADE, related_name='zip_coverages')
+    zip_area = models.ForeignKey(ZipArea, on_delete=models.CASCADE, related_name='delivery_agent_coverages')
+    is_active = models.BooleanField(default=True)
+    
+    # Optional: different delivery fees per area
+    delivery_fee_override = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True,
+                                               help_text="Override default delivery fee for this area")
+    
+    def __str__(self):
+        return f"{self.agent.user.get_full_name()} serves {self.zip_area.zip_code}"
+    
+    class Meta:
+        unique_together = ['agent', 'zip_area']
+        ordering = ['zip_area__zip_code']

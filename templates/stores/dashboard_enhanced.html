@@ -509,6 +509,16 @@
             </div>
         </a>
 
+        <a href="{% url 'stores:manage_zip_coverage' %}" class="quick-action">
+            <div class="action-icon">
+                <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <div>
+                <div class="fw-bold">ZIP Coverage</div>
+                <small class="text-muted">Manage delivery areas</small>
+            </div>
+        </a>
+
         <a href="#" class="quick-action" onclick="toggleStoreStatus()">
             <div class="action-icon">
                 <i class="fas fa-power-off"></i>
@@ -599,7 +609,7 @@
                     </div>
                     {% endfor %}
                     <div class="text-center mt-3">
-                        <a href="{% url 'stores:inventory' %}?stock=low" class="btn btn-sm btn-warning">
+                        <a href="{% url 'stores:inventory_management' %}?stock=low" class="btn btn-sm btn-warning">
                             <i class="fas fa-boxes me-1"></i>Update Stock
                         </a>
                     </div>
@@ -749,11 +759,31 @@ function playNotificationSound() {
 
 function updateOrderStatus(orderId, status) {
     if (confirm(`Are you sure you want to ${status} this order?`)) {
+        // Helper to read cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        const csrfToken = (csrfEl && csrfEl.value) || getCookie('csrftoken') || '{{ csrf_token }}';
+
         fetch('{% url "stores:update_order_status" %}', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                'X-CSRFToken': csrfToken
             },
             body: `order_id=${orderId}&status=${status}`
         })
@@ -776,12 +806,33 @@ function toggleStoreStatus() {
     const newStatus = currentStatus === 'open' ? 'closed' : 'open';
     
     if (confirm(`Are you sure you want to ${newStatus === 'open' ? 'open' : 'close'} the store?`)) {
+        // Determine CSRF token: prefer hidden input, fall back to cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrfTokenEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        const csrfToken = csrfTokenEl ? csrfTokenEl.value : getCookie('csrftoken');
+
         fetch('{% url "stores:toggle_store_status" %}', {
             method: 'POST',
             headers: {
-                'X-CSRFToken': '{{ csrf_token }}',
+                'X-CSRFToken': csrfToken,
                 'Content-Type': 'application/json',
-            }
+            },
+            body: JSON.stringify({})
         })
         .then(response => response.json())
         .then(data => {
@@ -799,14 +850,15 @@ function toggleStoreStatus() {
     }
 }
 
-function
+function showToast(type, message) {
+    const toast = document.createElement('div');
     toast.className = `toast show position-fixed top-0 end-0 m-3`;
     toast.style.zIndex = '9999';
-    
+
     const bgColor = type === 'success' ? 'bg-success' : 
                    type === 'error' ? 'bg-danger' : 
                    type === 'warning' ? 'bg-warning' : 'bg-info';
-    
+
     toast.innerHTML = `
         <div class="toast-header ${bgColor} text-white">
             <strong class="me-auto">${type.charAt(0).toUpperCase() + type.slice(1)}</strong>
@@ -816,9 +868,9 @@ function
             ${message}
         </div>
     `;
-    
+
     document.body.appendChild(toast);
-    
+
     // Auto-remove after 5 seconds
     setTimeout(() => {
         toast.remove();

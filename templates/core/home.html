@@ -578,7 +578,7 @@
                     <!-- Wishlist Button - Only for customers -->
                     {% if user.is_authenticated and is_customer %}
                     <button class="wishlist-btn {% if product.id in wishlist_items %}active{% endif %}" 
-                            data-store-product-id="{{ product.id }}">
+                                data-store-product-id="{{ product.id }}" data-wishlist-bound="1">
                         <i class="{% if product.id in wishlist_items %}fas{% else %}far{% endif %} fa-heart"></i>
                     </button>
                     {% endif %}
@@ -631,34 +631,12 @@
                 </div>
             </div>
             {% empty %}
-            <!-- Default products when none available -->
-            <div class="modern-product-card">
-                <div class="modern-product-image" style="color: #1565C0;">🐟</div>
-                <div class="modern-fresh-badge">FRESH</div>
-                <div class="modern-product-name">Fresh Pomfret</div>
-                <div class="modern-product-price">₹450/kg</div>
-                <button class="modern-add-btn">ADD TO CART</button>
-            </div>
-            <div class="modern-product-card">
-                <div class="modern-product-image" style="color: #C62828;">🍗</div>
-                <div class="modern-fresh-badge">FRESH</div>
-                <div class="modern-product-name">Chicken Breast</div>
-                <div class="modern-product-price">₹280/kg</div>
-                <button class="modern-add-btn">ADD TO CART</button>
-            </div>
-            <div class="modern-product-card">
-                <div class="modern-product-image" style="color: #2E7D32;">🥕</div>
-                <div class="modern-fresh-badge">ORGANIC</div>
-                <div class="modern-product-name">Baby Carrots</div>
-                <div class="modern-product-price">₹60/kg</div>
-                <button class="modern-add-btn">ADD TO CART</button>
-            </div>
-            <div class="modern-product-card">
-                <div class="modern-product-image" style="color: #FF8F00;">🌶️</div>
-                <div class="modern-fresh-badge">PREMIUM</div>
-                <div class="modern-product-name">Red Chili Powder</div>
-                <div class="modern-product-price">₹180/kg</div>
-                <button class="modern-add-btn">ADD TO CART</button>
+            <!-- No fresh arrivals available -->
+            <div class="col-12 text-center py-5">
+                <div style="font-size: 4rem; color: #e0e0e0; margin-bottom: 1rem;">📦</div>
+                <h4 style="color: #666; font-weight: 500;">No Fresh Arrivals Yet</h4>
+                <p style="color: #999; margin-bottom: 2rem;">New products will appear here when stores add them.</p>
+                <a href="{% url 'catalog:product_list' %}" class="btn btn-primary">Browse All Products</a>
             </div>
             {% endfor %}
         </div>
@@ -746,75 +724,12 @@
                     </div>
                 </div>
                 {% empty %}
-                <!-- Default products when none available -->
-                <div class="global-product-card">
-                    <div class="product-image">
-                        <div style="height: 100%; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
-                            <span style="font-size: 3rem;">🥩</span>
-                        </div>
-                        <div class="category-badge" style="background: linear-gradient(135deg, #ff6b6b, #ee5a24);">BEST SELLER</div>
-                    </div>
-                    <div class="product-content">
-                        <div class="product-title">Mutton Curry Cut</div>
-                        <div class="product-description">Premium quality mutton curry cut, perfect for your favorite recipes.</div>
-                        <div class="product-meta">
-                            <div class="product-weight">per kg</div>
-                        </div>
-                        <div class="product-pricing">
-                            <span class="current-price">₹650</span>
-                        </div>
-                        <div class="product-actions">
-                            <button class="add-to-cart-btn">
-                                <i class="fas fa-shopping-cart"></i>Add to Cart
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="global-product-card">
-                    <div class="product-image">
-                        <div style="height: 100%; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
-                            <span style="font-size: 3rem;">🦐</span>
-                        </div>
-                        <div class="category-badge" style="background: linear-gradient(135deg, #ff6b6b, #ee5a24);">BEST SELLER</div>
-                    </div>
-                    <div class="product-content">
-                        <div class="product-title">Fresh Prawns</div>
-                        <div class="product-description">Fresh prawns from the coast, cleaned and ready to cook.</div>
-                        <div class="product-meta">
-                            <div class="product-weight">per kg</div>
-                        </div>
-                        <div class="product-pricing">
-                            <span class="current-price">₹520</span>
-                        </div>
-                        <div class="product-actions">
-                            <button class="add-to-cart-btn">
-                                <i class="fas fa-shopping-cart"></i>Add to Cart
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="global-product-card">
-                    <div class="product-image">
-                        <div style="height: 100%; display: flex; align-items: center; justify-content: center; background: #f8f9fa;">
-                            <span style="font-size: 3rem;">🐠</span>
-                        </div>
-                        <div class="category-badge" style="background: linear-gradient(135deg, #ff6b6b, #ee5a24);">BEST SELLER</div>
-                    </div>
-                    <div class="product-content">
-                        <div class="product-title">Fresh Salmon</div>
-                        <div class="product-description">Premium Atlantic salmon fillet, rich in omega-3 fatty acids.</div>
-                        <div class="product-meta">
-                            <div class="product-weight">per kg</div>
-                        </div>
-                        <div class="product-pricing">
-                            <span class="current-price">₹800</span>
-                        </div>
-                        <div class="product-actions">
-                            <button class="add-to-cart-btn">
-                                <i class="fas fa-shopping-cart"></i>Add to Cart
-                            </button>
-                        </div>
-                    </div>
+                <!-- No best sellers available -->
+                <div class="col-12 text-center py-5">
+                    <div style="font-size: 4rem; color: #e0e0e0; margin-bottom: 1rem;">⭐</div>
+                    <h4 style="color: #666; font-weight: 500;">No Best Sellers Yet</h4>
+                    <p style="color: #999; margin-bottom: 2rem;">Popular products will appear here based on customer orders.</p>
+                    <a href="{% url 'catalog:product_list' %}" class="btn btn-primary">Browse All Products</a>
                 </div>
                 {% endfor %}
             </div>
@@ -822,12 +737,14 @@
     </div><script>
 function addToCart(productId) {
     // Add to cart functionality
+    console.debug('home.addToCart: sending POST', {'store_product_id': productId});
     fetch('/orders/cart/add/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
             'Content-Type': 'application/json'
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
             'store_product_id': productId,
             'quantity': 1
@@ -853,7 +770,8 @@ function addToCart(productId) {
     });
 }
 
-function
+function showToast(message, type='success') {
+    const toast = document.createElement('div');
     toast.className = `toast show position-fixed top-0 end-0 m-3`;
     toast.style.zIndex = '9999';
     toast.innerHTML = `
@@ -864,7 +782,6 @@ function
         <div class="toast-body">${message}</div>
     `;
     document.body.appendChild(toast);
-    
     // Auto remove after 3 seconds
     setTimeout(() => {
         if (toast.parentNode) {
@@ -872,6 +789,7 @@ function
         }
     }, 3000);
 }
+
 
 // Quantity control functions
 function showQuantityControls(productId) {
@@ -1022,19 +940,14 @@ function getCookie(name) {
     return cookieValue;
 }
 
-// Initialize wishlist event listeners when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    // Add event listeners to all wishlist buttons
-    const wishlistButtons = document.querySelectorAll('.wishlist-btn');
-    wishlistButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const storeProductId = this.getAttribute('data-store-product-id');
-            toggleWishlist(storeProductId);
-        });
-    });
-});
+// Delegate wishlist button binding to centralized module
+if (window.WishlistModule && typeof window.WishlistModule.bind === 'function') {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => window.WishlistModule.bind(document));
+    } else {
+        window.WishlistModule.bind(document);
+    }
+}
 
 // Add to cart from product card
 function addToCartFromCard(productId, productName, productPrice) {

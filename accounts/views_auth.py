@@ -6,11 +6,14 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.urls import reverse_lazy
 from django.template.loader import render_to_string
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 import random
 import string
 from .models import User, OTPVerification
@@ -18,186 +21,125 @@ from .forms import (
     PhoneLoginForm, PhoneRegistrationForm, StoreRegistrationForm, 
     DeliveryAgentRegistrationForm
 )
-from core.otp_service import OTPService
 
-class PhoneLoginView(View):
-    """Phone-based OTP login for customers"""
+class CustomerLoginView(View):
+    """Email-based login for customers"""
     
     def get(self, request):
         if request.user.is_authenticated and request.user.user_type == 'customer':
             return redirect('core:home')
-        return render(request, 'accounts/phone_login.html')
+        return render(request, 'accounts/customer_login.html')
     
     def post(self, request):
-        phone_number = request.POST.get('phone_number', '').strip()
-        otp_code = request.POST.get('otp_code', '').strip()
-        step = request.POST.get('step', 'phone')
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '').strip()
         
-        if step == 'phone':
-            # Step 1: Send OTP
-            if not phone_number:
-                return render(request, 'accounts/phone_login.html')
-            
-            # Validate phone number format (basic validation)
-            if not phone_number.isdigit() or len(phone_number) != 10:
-                return render(request, 'accounts/phone_login.html')
-            
-            # Check if user exists with this phone number
-            user = User.objects.filter(phone_number=phone_number, user_type='customer').first()
-            if not user:
-                # User doesn't exist - redirect to registration with message
-                return redirect(f'/accounts/phone-register/?error=no_account&phone={phone_number}')
-            
-            # Generate and send OTP using Twilio
-            otp_service = OTPService()
-            success, message = otp_service.send_otp_to_phone(phone_number)
-            
-            if success:
-                return render(request, 'accounts/phone_login.html', {
-                    'step': 'otp',
-                    'phone_number': phone_number
-                })
+        if not email or not password:
+            context = {'error_message': 'Please enter both email and password.'}
+            return render(request, 'accounts/customer_login.html', context)
+        
+        # Validate email format
+        try:
+            validate_email(email)
+        except ValidationError:
+            context = {'error_message': 'Please enter a valid email address.'}
+            return render(request, 'accounts/customer_login.html', context)
+        
+        # Authenticate user
+        user = authenticate(request, username=email, password=password)
+        
+        if user is not None and user.user_type == 'customer':
+            if user.is_active:
+                login(request, user)
+                messages.success(request, f'Welcome back, {user.first_name or user.username}!')
+                return redirect('core:home')
             else:
-                return render(request, 'accounts/phone_login.html')
-        
-        elif step == 'otp':
-            # Step 2: Verify OTP
-            if not otp_code:
-                return render(request, 'accounts/phone_login.html', {
-                    'step': 'otp',
-                    'phone_number': phone_number
-                })
-            
-            # Verify OTP using Twilio service
-            otp_service = OTPService()
-            success, message = otp_service.verify_otp(phone_number, otp_code)
-            
-            if success:
-                # Find user and login
-                user = User.objects.filter(phone_number=phone_number, user_type='customer').first()
-                if user:
-                    user.phone_verified = True
-                    user.save()
-                    
-                    login(request, user)
-                    return redirect('core:home')
-                else:
-                    return render(request, 'accounts/phone_login.html', {
-                        'step': 'otp', 
-                        'phone_number': phone_number
-                    })
+                context = {'error_message': 'Your account is inactive. Please contact support.'}
+                return render(request, 'accounts/customer_login.html', context)
+        else:
+            # Check if user exists but wrong password
+            user_exists = User.objects.filter(email=email, user_type='customer').exists()
+            if user_exists:
+                context = {'error_message': 'Invalid password. Please try again.'}
             else:
-                return render(request, 'accounts/phone_login.html', {
-                    'step': 'otp',
-                    'phone_number': phone_number
-                })
-        
-        return render(request, 'accounts/phone_login.html')
+                context = {'error_message': 'No account found with this email. Please register first.'}
+            return render(request, 'accounts/customer_login.html', context)
 
-class PhoneRegistrationView(View):
-    """Phone-based OTP registration for customers"""
+class CustomerRegistrationView(View):
+    """Email-based registration for customers"""
     
     def get(self, request):
         if request.user.is_authenticated:
             return redirect('core:home')
+        return render(request, 'accounts/customer_register.html')
+    
+    def post(self, request):
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '').strip()
+        confirm_password = request.POST.get('confirm_password', '').strip()
+        phone_number = request.POST.get('phone_number', '').strip()
         
         context = {}
         
-        # Check if user was redirected from login due to no account
-        error = request.GET.get('error')
-        phone = request.GET.get('phone')
+        # Validation
+        if not all([first_name, email, password, confirm_password]):
+            context['error_message'] = 'Please fill in all required fields.'
+            return render(request, 'accounts/customer_register.html', context)
         
-        if error == 'no_account':
-            context['error_message'] = "No Account Exists - Please Register Your Account"
-            context['suggested_phone'] = phone
+        # Validate email format
+        try:
+            validate_email(email)
+        except ValidationError:
+            context['error_message'] = 'Please enter a valid email address.'
+            return render(request, 'accounts/customer_register.html', context)
         
-        return render(request, 'accounts/phone_register.html', context)
-    
-    def post(self, request):
-        name = request.POST.get('name', '').strip()
-        email = request.POST.get('email', '').strip()
-        phone_number = request.POST.get('phone_number', '').strip()
-        otp_code = request.POST.get('otp_code', '').strip()
-        step = request.POST.get('step', 'details')
+        # Password validation
+        if password != confirm_password:
+            context['error_message'] = 'Passwords do not match.'
+            return render(request, 'accounts/customer_register.html', context)
         
-        if step == 'details':
-            # Step 1: Collect user details and send OTP
-            if not all([name, email, phone_number]):
-                return render(request, 'accounts/phone_register.html')
-            
-            # Validate phone number
-            if not phone_number.isdigit() or len(phone_number) != 10:
-                return render(request, 'accounts/phone_register.html')
-            
-            # Check if phone number already exists
-            if User.objects.filter(phone_number=phone_number).exists():
-                return render(request, 'accounts/phone_register.html')
-            
-            # Check if email already exists
-            if User.objects.filter(email=email).exists():
-                return render(request, 'accounts/phone_register.html')
-            
-            # Generate and send OTP using Twilio
-            otp_service = OTPService()
-            success, message = otp_service.send_otp_to_phone(phone_number)
-            
-            if success:
-                # Store registration data in session
-                request.session['registration_data'] = {
-                    'name': name,
-                    'email': email,
-                    'phone_number': phone_number
-                }
-                return render(request, 'accounts/phone_register.html', {
-                    'step': 'otp',
-                    'phone_number': phone_number
-                })
-            else:
-                return render(request, 'accounts/phone_register.html')
+        if len(password) < 6:
+            context['error_message'] = 'Password must be at least 6 characters long.'
+            return render(request, 'accounts/customer_register.html', context)
         
-        elif step == 'otp':
-            # Step 2: Verify OTP and create account
-            if not otp_code:
-                return render(request, 'accounts/phone_register.html', {
-                    'step': 'otp',
-                    'phone_number': phone_number
-                })
-            
-            registration_data = request.session.get('registration_data')
-            if not registration_data:
-                return redirect('accounts:phone_register')
-            
-            # Verify OTP using Twilio service
-            otp_service = OTPService()
-            success, message = otp_service.verify_otp(registration_data['phone_number'], otp_code)
-            
-            if success:
-                # Create user account
-                username = f"user_{registration_data['phone_number']}"
-                user = User.objects.create_user(
-                    username=username,
-                    email=registration_data['email'],
-                    first_name=registration_data['name'].split(' ')[0],
-                    last_name=' '.join(registration_data['name'].split(' ')[1:]) if ' ' in registration_data['name'] else '',
-                    phone_number=registration_data['phone_number'],
-                    user_type='customer',
-                    phone_verified=True,
-                    email_verified=False
-                )
-                
-                # Clear session data
-                del request.session['registration_data']
-                
-                # Login user
-                login(request, user)
-                return redirect('core:home')
-            else:
-                return render(request, 'accounts/phone_register.html', {
-                    'step': 'otp',
-                    'phone_number': registration_data['phone_number']
-                })
+        # Validate phone number if provided
+        if phone_number and (not phone_number.isdigit() or len(phone_number) != 10):
+            context['error_message'] = 'Please enter a valid 10-digit phone number.'
+            return render(request, 'accounts/customer_register.html', context)
         
-        return render(request, 'accounts/phone_register.html')
+        # Check if email already exists
+        if User.objects.filter(email=email).exists():
+            context['error_message'] = 'An account with this email already exists.'
+            return render(request, 'accounts/customer_register.html', context)
+        
+        # Check if phone number already exists (if provided)
+        if phone_number and User.objects.filter(phone_number=phone_number).exists():
+            context['error_message'] = 'An account with this phone number already exists.'
+            return render(request, 'accounts/customer_register.html', context)
+        
+        try:
+            # Create user account
+            user = User.objects.create_user(
+                username=email,  # Use email as username
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                phone_number=phone_number if phone_number else None,
+                user_type='customer',
+                email_verified=False  # Can be set to True if you don't want email verification
+            )
+            
+            # Login user immediately
+            login(request, user)
+            messages.success(request, 'Account created successfully! Welcome to Fresh Express.')
+            return redirect('core:home')
+            
+        except Exception as e:
+            context['error_message'] = f'Error creating account: {str(e)}'
+            return render(request, 'accounts/customer_register.html', context)
 
 class EmailLoginView(View):
     """Email-based login for Store Admin and Delivery agents (NOT for main Admin)"""
@@ -212,7 +154,7 @@ class EmailLoginView(View):
             if user_type == 'store' and request.user.user_type in ['store_owner', 'store_staff']:
                 return redirect('stores:dashboard')
             elif user_type == 'delivery' and request.user.user_type == 'delivery_agent':
-                return redirect('delivery:dashboard')
+                return redirect('delivery:agent_dashboard')
         
         return render(request, 'accounts/email_login.html', {'user_type': user_type})
     
@@ -336,14 +278,13 @@ class StoreRegistrationView(View):
         address = request.POST.get('address', '').strip()
         city = request.POST.get('city', '').strip()
         zip_code = request.POST.get('zip_code', '').strip()
-        store_type = request.POST.get('store_type', '').strip()
         gst_number = request.POST.get('gst_number', '').strip()
         description = request.POST.get('description', '').strip()
         password = request.POST.get('password', '').strip()
         confirm_password = request.POST.get('confirm_password', '').strip()
         
-        # Validate required fields
-        required_fields = [store_name, owner_name, email, phone, address, city, zip_code, store_type, password]
+        # Validate required fields (removed store_type from validation)
+        required_fields = [store_name, owner_name, email, phone, address, city, zip_code, password]
         if not all(required_fields):
             return render(request, 'accounts/store_register.html')
         
@@ -368,7 +309,6 @@ class StoreRegistrationView(View):
             'address': address,
             'city': city,
             'zip_code': zip_code,
-            'store_type': store_type,
             'gst_number': gst_number,
             'description': description,
             'status': 'pending_review',
@@ -450,8 +390,14 @@ class DeliveryAgentRegistrationView(View):
         confirm_password = request.POST.get('confirm_password', '').strip()
         
         # Validate required fields
-        required_fields = [full_name, email, phone_number, address, city, zip_code, 
-                          vehicle_type, vehicle_number, license_number, password]
+        # For bicycles, vehicle_number and license_number are optional
+        if vehicle_type == 'bicycle':
+            required_fields = [full_name, email, phone_number, address, city, zip_code, 
+                              vehicle_type, password]
+        else:
+            required_fields = [full_name, email, phone_number, address, city, zip_code, 
+                              vehicle_type, vehicle_number, license_number, password]
+        
         if not all(required_fields):
             return render(request, 'accounts/delivery_register.html')
         
@@ -519,15 +465,23 @@ class DeliveryAgentRegistrationView(View):
                     phone_number=phone_number,
                     emergency_contact=emergency_contact,
                     vehicle_type=vehicle_type,
-                    vehicle_number=vehicle_number,
-                    license_number=license_number,
+                    vehicle_number=vehicle_number or 'N/A',  # Use 'N/A' for bicycles
+                    license_number=license_number or 'N/A',  # Use 'N/A' for bicycles
                     status='inactive',  # Agent starts as inactive until they go online
                     is_available=False
                 )
             return redirect('accounts:email_login')
             
         except Exception as e:
-            return render(request, 'accounts/delivery_register.html')
+            print(f"Delivery agent registration error: {e}")  # For debugging
+            import traceback
+            traceback.print_exc()
+            context = {
+                'error_message': 'Registration failed. Please try again.',
+                'suggested_email': email,
+                'form_data': request.POST  # To preserve form data
+            }
+            return render(request, 'accounts/delivery_register.html', context)
 
 class BusinessRegistrationView(View):
     """Business registration landing page for choosing store owner or delivery agent"""

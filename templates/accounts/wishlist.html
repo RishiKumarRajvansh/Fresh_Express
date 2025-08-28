@@ -229,7 +229,7 @@
                             {% endif %}
                             
                             <!-- Wishlist Heart - Always filled since it's in wishlist -->
-                            <button class="wishlist-btn" onclick="toggleWishlist({{ item.store_product.id }}, this)">
+                            <button class="wishlist-btn" data-wishlist-bound="1" onclick="toggleWishlist({{ item.store_product.id }}, this)">
                                 <i class="fas fa-heart"></i>
                             </button>
                         </div>
@@ -295,12 +295,14 @@ function toggleWishlist(storeProductId, element) {
     const originalContent = element.innerHTML;
     element.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     
+    console.debug('wishlist.toggleWishlist: sending POST', {store_product_id: storeProductId});
     fetch('/accounts/wishlist/toggle/', {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
+            'X-CSRFToken': (document.cookie.match(new RegExp('(^| )csrftoken=([^;]+)')) || [])[2],
             'Content-Type': 'application/json',
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
             'store_product_id': storeProductId
         })
@@ -354,12 +356,14 @@ function toggleWishlist(storeProductId, element) {
 }
 
 function addToCart(productId) {
+    console.debug('wishlist.addToCart: sending POST', {store_product_id: productId});
     fetch('/orders/cart/add/', {
         method: 'POST',
         headers: {
-            'X-CSRFToken': '{{ csrf_token }}',
+            'X-CSRFToken': (document.cookie.match(new RegExp('(^| )csrftoken=([^;]+)')) || [])[2],
             'Content-Type': 'application/json',
         },
+        credentials: 'same-origin',
         body: JSON.stringify({
             store_product_id: productId,
             quantity: 1

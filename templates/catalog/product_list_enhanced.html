@@ -356,8 +356,8 @@
                         </div>
                         
                         <div class="product-actions">
-                            <button class="wishlist-btn {% if store_product.id in wishlist_items %}active{% endif %}" 
-                                    data-store-product-id="{{ store_product.id }}">
+                <button class="wishlist-btn {% if store_product.id in wishlist_items %}active{% endif %}" 
+                    data-store-product-id="{{ store_product.id }}" data-wishlist-bound="1">
                                 <i class="{% if store_product.id in wishlist_items %}fas{% else %}far{% endif %} fa-heart"></i>
                             </button>
                         </div>
@@ -515,29 +515,53 @@ function updatePriceFilter() {
     }, 1000); // Wait 1 second after user stops dragging
 }
 
+// Get CSRF token from cookie
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 // Add to cart functionality
 function addToCart(storeProductId) {
     if (!{{ user.is_authenticated|yesno:"true,false" }}) {
-        window.location.href = '{% url "accounts:login" %}';
+        window.location.href = '{% url "accounts:customer_login" %}';
         return;
     }
-    
+
     fetch('{% url "catalog:add_to_cart_api" %}', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': '{{ csrf_token }}'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
         },
-        body: `store_product_id=${storeProductId}&quantity=1`
+        credentials: 'same-origin',
+        body: JSON.stringify({ store_product_id: storeProductId, quantity: 1 })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.debug('addToCart: response status', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.debug('addToCart: response json', data);
         if (data.success) {
-            // Update cart count
-            document.getElementById('cart-count').textContent = data.cart_total;
-            document.getElementById('mobile-cart-count').textContent = data.cart_total;
-            
-                    } else {
+            // Update cart counters if provided
+            if (data.cart_count !== undefined) {
+                document.getElementById('cart-count').textContent = data.cart_count;
+                document.getElementById('mobile-cart-count').textContent = data.cart_count;
+            } else if (data.cart_total !== undefined) {
+                document.getElementById('cart-count').textContent = data.cart_total;
+                document.getElementById('mobile-cart-count').textContent = data.cart_total;
+            }
         }
     })
     .catch(error => {
@@ -545,60 +569,25 @@ function addToCart(storeProductId) {
     });
 }
 
-// Wishlist functionality
-document.querySelectorAll('.wishlist-btn').forEach(btn => {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation(); // Prevent navigation
-        const storeProductId = this.getAttribute('data-store-product-id');
-        toggleWishlist(storeProductId);
-    });
-});
-
-function toggleWishlist(storeProductId) {
-    if (!{{ user.is_authenticated|yesno:"true,false" }}) {
-        window.location.href = '{% url "accounts:login" %}';
-        return;
-    }
-    
-    fetch('{% url "accounts:toggle_wishlist_new" %}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: `store_product_id=${storeProductId}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const btn = document.querySelector(`[data-store-product-id="${storeProductId}"]`);
-            const icon = btn.querySelector('i');
-            
-            if (data.action === 'added') {
-                btn.classList.add('active');
-                icon.className = 'fas fa-heart';
-            } else {
-                btn.classList.remove('active');
-                icon.className = 'far fa-heart';
-            }
-        }
-    })
-    .catch(error => console.error('Error:', error));
+// Wishlist functionality: delegate to centralized module
+if (window.WishlistModule && typeof window.WishlistModule.bind === 'function') {
+    window.WishlistModule.bind(document);
 }
 
 // Toast notification system
-function
+function showToast(message, type='info') {
+    const toast = document.createElement('div');
+    toast.className = `toast show position-fixed top-0 end-0 m-3`;
     toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 300px;';
     toast.innerHTML = `
-        ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="toast-header ${type === 'success' ? 'bg-success text-white' : type === 'error' ? 'bg-danger text-white' : 'bg-secondary text-white'}">
+            <strong class="me-auto">${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Notice'}</strong>
+            <button type="button" class="btn-close btn-close-white" onclick="this.closest('.toast').remove()"></button>
+        </div>
+        <div class="toast-body">${message}</div>
     `;
-    
     document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.remove();
-    }, 5000);
+    setTimeout(() => toast.remove(), 5000);
 }
 
 // Product card click navigation

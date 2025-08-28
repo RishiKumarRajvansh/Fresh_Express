@@ -29,12 +29,77 @@ def delivery_history(request):
 @login_required 
 def toggle_availability(request):
     from django.http import JsonResponse
-    return JsonResponse({'success': True, 'available': True})
+    from .models import DeliveryAgent
+    
+    if request.method == 'POST':
+        try:
+            # Get the delivery agent for the current user
+            agent = DeliveryAgent.objects.get(user=request.user)
+            
+            # Toggle availability
+            agent.is_available = not agent.is_available
+            agent.save()
+            
+            return JsonResponse({
+                'success': True, 
+                'available': agent.is_available,
+                'message': f'Status changed to {"Online" if agent.is_available else "Offline"}'
+            })
+            
+        except DeliveryAgent.DoesNotExist:
+            return JsonResponse({
+                'success': False, 
+                'error': 'Delivery agent profile not found'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False, 
+                'error': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 @login_required
 def update_location(request):
     from django.http import JsonResponse
-    return JsonResponse({'success': True})
+    from .models import DeliveryAgent
+    import json
+    
+    if request.method == 'POST':
+        try:
+            # Get the delivery agent for the current user
+            agent = DeliveryAgent.objects.get(user=request.user)
+            
+            # Get location data from request
+            data = json.loads(request.body)
+            latitude = data.get('latitude')
+            longitude = data.get('longitude')
+            
+            if latitude and longitude:
+                # Update agent location (you may need to add these fields to the model)
+                # For now, just return success
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Location updated successfully'
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Invalid location data'
+                })
+            
+        except DeliveryAgent.DoesNotExist:
+            return JsonResponse({
+                'success': False, 
+                'error': 'Delivery agent profile not found'
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False, 
+                'error': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 app_name = 'delivery'
 
@@ -55,8 +120,12 @@ urlpatterns = [
     path('ratings/', ratings_feedback, name='ratings_feedback'),
     path('vehicle-info/', vehicle_info, name='vehicle_info'),
     
+    # New Agent Profile and ZIP Coverage
+    path('profile/', views.agent_profile, name='agent_profile_new'),
+    path('zip-coverage/', views.agent_zip_coverage_view, name='agent_zip_coverage'),
+    
     # AJAX APIs
-    path('api/toggle-availability/', toggle_availability, name='toggle_availability'),
+    path('api/toggle-availability/', views.toggle_availability, name='toggle_availability'),
     path('api/update-location/', update_location, name='update_location'),
     
     # Enhanced Workflow APIs

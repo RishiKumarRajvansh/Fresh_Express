@@ -15,6 +15,8 @@ urlpatterns = [
     path('orders/', views.store_orders, name='orders_management'),
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
     path('inventory/', views.store_inventory, name='inventory_management'),
+    path('inventory/edit/<int:product_id>/', views.edit_store_product, name='edit_product'),
+    path('inventory/delete/<int:product_id>/', views.delete_store_product, name='delete_product'),
     path('agents/', views.delivery_agents, name='delivery_agents'),
     
     # Additional store management URLs
@@ -28,6 +30,9 @@ urlpatterns = [
     path('bulk-import/validate/', views_bulk_import.validate_csv_data, name='validate_csv'),
     path('bulk-import/history/', views_bulk_import.import_history, name='import_history'),
     path('bulk-import/sample-csv/', views_bulk_import.download_sample_csv, name='sample_csv'),
+    
+    # ZIP Area Management
+    path('zip-coverage/', views.manage_zip_coverage, name='manage_zip_coverage'),
     
     # API endpoints for AJAX
     path('api/check-availability/', views.CheckAvailabilityView.as_view(), name='check_availability'),

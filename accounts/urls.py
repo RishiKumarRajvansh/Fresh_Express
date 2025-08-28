@@ -7,10 +7,13 @@ from . import views_auth
 app_name = 'accounts'
 
 urlpatterns = [
-    # Primary Phone-based Authentication (For Customers)
-    path('phone-login/', views_auth.PhoneLoginView.as_view(), name='phone_login'),
-    path('phone-register/', views_auth.PhoneRegistrationView.as_view(), name='phone_register'),
-    path('resend-otp/', views_auth.ResendOTPView.as_view(), name='resend_otp'),
+    # Customer Authentication (Email-based)
+    path('login/', views_auth.CustomerLoginView.as_view(), name='customer_login'),
+    path('register/', views_auth.CustomerRegistrationView.as_view(), name='customer_register'),
+    
+    # Legacy URLs for backward compatibility (redirect to new ones)
+    path('phone-login/', views_auth.CustomerLoginView.as_view(), name='phone_login'),
+    path('phone-register/', views_auth.CustomerRegistrationView.as_view(), name='phone_register'),
     
     # Email-based Authentication (Admin, Store, Delivery)
     path('email-login/', views_auth.EmailLoginView.as_view(), name='email_login'),
@@ -34,10 +37,6 @@ urlpatterns = [
     
     # Common Authentication
     path('logout/', views_auth.LogoutView.as_view(), name='logout'),
-    
-    # Default login/register redirects
-    path('login/', views_auth.PhoneLoginView.as_view(), name='login'),  # Default to phone login
-    path('register/', views_auth.PhoneRegistrationView.as_view(), name='register'),  # Default to phone register
     
     # Profile Management
     path('profile/', views.ProfileView.as_view(), name='profile'),

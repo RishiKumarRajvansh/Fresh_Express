@@ -187,20 +187,26 @@
                 </div>
                 <div class="col-md-6 form-group">
                     <label for="vehicle_number" class="form-label">
-                        Vehicle Registration Number <span class="required-field">*</span>
+                        Vehicle Registration Number <span class="required-field" id="vehicle_number_required">*</span>
                     </label>
                     <input type="text" class="form-control" id="vehicle_number" name="vehicle_number" 
-                           placeholder="Enter vehicle number" required>
+                           placeholder="Enter vehicle number">
+                    <small class="text-muted" id="vehicle_number_note" style="display: none;">
+                        Not required for bicycles
+                    </small>
                 </div>
             </div>
             
             <div class="row">
                 <div class="col-md-6 form-group">
                     <label for="license_number" class="form-label">
-                        Driving License Number <span class="required-field">*</span>
+                        Driving License Number <span class="required-field" id="license_required">*</span>
                     </label>
                     <input type="text" class="form-control" id="license_number" name="license_number" 
-                           placeholder="Enter license number" required>
+                           placeholder="Enter license number">
+                    <small class="text-muted" id="license_note" style="display: none;">
+                        Not required for bicycles
+                    </small>
                 </div>
                 <div class="col-md-6 form-group">
                     <label for="experience_years" class="form-label">Years of Experience</label>
@@ -274,6 +280,43 @@ document.addEventListener('DOMContentLoaded', function() {
             form.classList.add('was-validated');
         }, false);
     });
+    
+    // Vehicle type change handler
+    const vehicleTypeSelect = document.getElementById('vehicle_type');
+    const vehicleNumberInput = document.getElementById('vehicle_number');
+    const licenseNumberInput = document.getElementById('license_number');
+    const vehicleNumberRequired = document.getElementById('vehicle_number_required');
+    const licenseRequired = document.getElementById('license_required');
+    const vehicleNumberNote = document.getElementById('vehicle_number_note');
+    const licenseNote = document.getElementById('license_note');
+    
+    if (vehicleTypeSelect) {
+        vehicleTypeSelect.addEventListener('change', function(e) {
+            const isBicycle = e.target.value === 'bicycle';
+            
+            if (isBicycle) {
+                // For bicycles, make fields optional
+                vehicleNumberInput.removeAttribute('required');
+                licenseNumberInput.removeAttribute('required');
+                vehicleNumberRequired.style.display = 'none';
+                licenseRequired.style.display = 'none';
+                vehicleNumberNote.style.display = 'block';
+                licenseNote.style.display = 'block';
+                vehicleNumberInput.placeholder = 'Not required for bicycles';
+                licenseNumberInput.placeholder = 'Not required for bicycles';
+            } else {
+                // For other vehicles, make fields required
+                vehicleNumberInput.setAttribute('required', 'required');
+                licenseNumberInput.setAttribute('required', 'required');
+                vehicleNumberRequired.style.display = 'inline';
+                licenseRequired.style.display = 'inline';
+                vehicleNumberNote.style.display = 'none';
+                licenseNote.style.display = 'none';
+                vehicleNumberInput.placeholder = 'Enter vehicle number';
+                licenseNumberInput.placeholder = 'Enter license number';
+            }
+        });
+    }
     
     // Phone number formatting
     const phoneInputs = document.querySelectorAll('input[type="tel"]');

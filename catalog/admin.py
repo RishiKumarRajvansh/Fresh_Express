@@ -102,6 +102,47 @@ class ProductAdmin(admin.ModelAdmin):
         return f"{main_image + additional_count}/5"
     image_count.short_description = 'Images'
     
+    def save_model(self, request, obj, form, change):
+        """Override save to ensure admin-created products are assigned to a store"""
+        super().save_model(request, obj, form, change)
+        
+        if not change:  # Only for new products
+            from stores.models import Store
+            
+            # Try to find admin's own store first
+            admin_store = None
+            if hasattr(request.user, 'owned_stores'):
+                admin_store = request.user.owned_stores.filter(is_active=True).first()
+            
+            # If admin doesn't have a store, create one
+            if not admin_store:
+                admin_store, created = Store.objects.get_or_create(
+                    owner=request.user,
+                    defaults={
+                        'name': 'Admin Store',
+                        'store_code': f'ADMIN{request.user.id:04d}',
+                        'phone_number': '9999999999',
+                        'email': request.user.email,
+                        'address_line_1': 'Admin Address',
+                        'city': 'Delhi',
+                        'state': 'Delhi',
+                        'zip_code': '110001',
+                        'status': 'open',
+                        'is_active': True
+                    }
+                )
+            
+            # Create StoreProduct entry
+            StoreProduct.objects.get_or_create(
+                store=admin_store,
+                product=obj,
+                defaults={
+                    'price': 0.00,  # Admin should set price later
+                    'stock_quantity': 0,  # Admin should set stock later
+                    'is_available': False,  # Admin should make it available after setting price/stock
+                }
+            )
+    
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'slug', 'category', 'description')

@@ -23,21 +23,30 @@ class ProductListView(ListView):
         return super().dispatch(request, *args, **kwargs)
     
     def get_queryset(self):
-        # Get the automatically selected store from session
-        store_id = self.request.session.get('selected_store_id')
+        # Get selected ZIP code from session
         selected_zip = self.request.session.get('selected_zip_code')
         
-        if not store_id:
+        if not selected_zip:
             return StoreProduct.objects.none()
         
+        # Get all stores that serve the selected ZIP area through StoreZipCoverage
         try:
-            store = Store.objects.get(id=store_id, is_active=True)
-        except Store.DoesNotExist:
+            from locations.models import ZipArea
+            from stores.models import StoreZipCoverage
+            
+            zip_area = ZipArea.objects.get(zip_code=selected_zip, is_active=True)
+            available_stores = Store.objects.filter(
+                zip_coverages__zip_area=zip_area,
+                zip_coverages__is_active=True,
+                is_active=True,
+                status='open'
+            ).distinct()
+        except ZipArea.DoesNotExist:
             return StoreProduct.objects.none()
         
-        # Get products from the selected store
+        # Get products from all stores in the area
         queryset = StoreProduct.objects.filter(
-            store=store,
+            store__in=available_stores,
             is_available=True,
             availability_status='in_stock'
         ).select_related('product', 'store', 'product__category').order_by('product__name')
@@ -104,33 +113,70 @@ class ProductListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Get store information
-        store_id = self.request.session.get('selected_store_id')
-        if store_id:
+        # Get ZIP information
+        selected_zip = self.request.session.get('selected_zip_code')
+        if selected_zip:
             try:
-                context['selected_store'] = Store.objects.get(id=store_id)
-            except Store.DoesNotExist:
+                from locations.models import ZipArea
+                from stores.models import StoreZipCoverage
+                
+                zip_area = ZipArea.objects.get(zip_code=selected_zip, is_active=True)
+                context['selected_zip'] = selected_zip
+                context['zip_area'] = zip_area
+                
+                # Get all stores that serve this ZIP area
+                available_stores = Store.objects.filter(
+                    zip_coverages__zip_area=zip_area,
+                    zip_coverages__is_active=True,
+                    is_active=True,
+                    status='open'
+                ).distinct()
+                context['available_stores'] = available_stores
+                context['store_count'] = available_stores.count()
+            except ZipArea.DoesNotExist:
                 pass
         
-        # Get categories for filtering (only active categories with products)
-        categories = Category.objects.filter(
-            is_active=True,
-            parent__isnull=True,
-            product__storeproduct__store_id=store_id,
-            product__storeproduct__is_available=True
-        ).distinct().order_by('sort_order', 'name')
-        context['categories'] = categories
+        # Get categories for filtering (only active categories with products from stores in the area)
+        if selected_zip:
+            try:
+                from locations.models import ZipArea
+                from stores.models import StoreZipCoverage
+                
+                zip_area = ZipArea.objects.get(zip_code=selected_zip, is_active=True)
+                available_stores = Store.objects.filter(
+                    zip_coverages__zip_area=zip_area,
+                    zip_coverages__is_active=True,
+                    is_active=True,
+                    status='open'
+                ).distinct()
+                
+                categories = Category.objects.filter(
+                    is_active=True,
+                    parent__isnull=True,
+                    product__storeproduct__store__in=available_stores,
+                    product__storeproduct__is_available=True
+                ).distinct().order_by('sort_order', 'name')
+                context['categories'] = categories
+            except ZipArea.DoesNotExist:
+                context['categories'] = Category.objects.none()
+        else:
+            context['categories'] = Category.objects.none()
         
         # Get subcategories if category is selected
         category_slug = self.request.GET.get('category')
-        if category_slug:
+        if category_slug and selected_zip:
             try:
                 selected_category = Category.objects.get(slug=category_slug)
                 context['selected_category'] = selected_category
+                available_stores = Store.objects.filter(
+                    zip_code=selected_zip,
+                    is_active=True,
+                    status='open'
+                )
                 subcategories = Category.objects.filter(
                     parent=selected_category,
                     is_active=True,
-                    product__storeproduct__store_id=store_id,
+                    product__storeproduct__store__in=available_stores,
                     product__storeproduct__is_available=True
                 ).distinct().order_by('sort_order', 'name')
                 context['subcategories'] = subcategories
@@ -138,9 +184,14 @@ class ProductListView(ListView):
                 pass
         
         # Get price range for filtering
-        if store_id:
+        if selected_zip:
+            available_stores = Store.objects.filter(
+                zip_code=selected_zip,
+                is_active=True,
+                status='open'
+            )
             price_range = StoreProduct.objects.filter(
-                store_id=store_id,
+                store__in=available_stores,
                 is_available=True
             ).aggregate(
                 min_price=Min('price'),
@@ -149,11 +200,17 @@ class ProductListView(ListView):
             context['price_range'] = price_range
         
         # Get unit types for filtering
-        unit_types = StoreProduct.objects.filter(
-            store_id=store_id,
-            is_available=True
-        ).values_list('product__unit_type', flat=True).distinct()
-        context['unit_types'] = [ut for ut in unit_types if ut]
+        if selected_zip:
+            available_stores = Store.objects.filter(
+                zip_code=selected_zip,
+                is_active=True,
+                status='open'
+            )
+            unit_types = StoreProduct.objects.filter(
+                store__in=available_stores,
+                is_available=True
+            ).values_list('product__unit_type', flat=True).distinct()
+            context['unit_types'] = [ut for ut in unit_types if ut]
         
         # Current filters for display
         context['current_filters'] = {
@@ -278,39 +335,60 @@ class ProductDetailView(DetailView):
         return super().dispatch(request, *args, **kwargs)
     
     def get_object(self):
-        store_id = self.request.session.get('selected_store_id')
+        selected_zip = self.request.session.get('selected_zip_code')
         product_slug = self.kwargs.get('product_slug')
         
-        if not store_id or not product_slug:
+        if not selected_zip or not product_slug:
             return None
         
-        return get_object_or_404(
-            StoreProduct.objects.select_related('product', 'store'),
-            store_id=store_id,
+        # Get stores in the selected zip area
+        available_stores = Store.objects.filter(
+            zip_code=selected_zip,
+            is_active=True,
+            status='open'
+        )
+        
+        # Get the product from any available store (preferably the cheapest)
+        return StoreProduct.objects.filter(
+            store__in=available_stores,
             product__slug=product_slug,
             is_available=True
-        )
+        ).select_related('product', 'store').order_by('price').first()
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         store_product = self.get_object()
         
         if store_product:
-            # Get related products from same store
+            selected_zip = self.request.session.get('selected_zip_code')
+            available_stores = Store.objects.filter(
+                zip_code=selected_zip,
+                is_active=True,
+                status='open'
+            )
+            
+            # Get all available options for this product from different stores
+            context['product_options'] = StoreProduct.objects.filter(
+                store__in=available_stores,
+                product=store_product.product,
+                is_available=True
+            ).select_related('store').order_by('price')
+            
+            # Get related products from all stores in the area
             context['related_products'] = StoreProduct.objects.filter(
-                store=store_product.store,
+                store__in=available_stores,
                 product__category=store_product.product.category,
                 is_available=True
-            ).exclude(id=store_product.id)[:4]
+            ).exclude(product=store_product.product).select_related('product', 'store')[:4]
             
-            # Get frequently bought together
+            # Get frequently bought together from all stores
             context['frequently_bought'] = StoreProduct.objects.filter(
-                store=store_product.store,
+                store__in=available_stores,
                 is_available=True,
                 product__category__in=[
                     store_product.product.category,
                 ]
-            ).exclude(id=store_product.id)[:3]
+            ).exclude(product=store_product.product).select_related('product', 'store')[:3]
         
         return context
 
@@ -393,10 +471,15 @@ class ProductSuggestionsAPIView(TemplateView):
 
 class AddToCartAPIView(TemplateView):
     def post(self, request, *args, **kwargs):
-        # This will be implemented when we create the cart functionality
-        return JsonResponse({'success': True, 'message': 'Added to cart!'})
-    def post(self, request, *args, **kwargs):
-        return JsonResponse({'success': True})
+        """
+        Proxy to the orders.add_to_cart_view so catalog pages can add items to cart
+        using the same server-side logic and return the same JSON shape.
+        """
+        try:
+            from orders.views import add_to_cart_view
+            return add_to_cart_view(request)
+        except Exception:
+            return JsonResponse({'success': False, 'message': 'Error adding to cart'})
 
 class FilterOptionsAPIView(TemplateView):
     def get(self, request, *args, **kwargs):

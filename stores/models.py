@@ -133,8 +133,8 @@ class StoreStaff(TimeStampedModel):
 
 class StoreZipCoverage(TimeStampedModel):
     """Store coverage for specific ZIP codes with custom settings"""
-    store = models.ForeignKey(Store, on_delete=models.CASCADE)
-    zip_area = models.ForeignKey(ZipArea, on_delete=models.CASCADE)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='zip_coverages')
+    zip_area = models.ForeignKey(ZipArea, on_delete=models.CASCADE, related_name='store_coverages')
     
     # Override settings for this ZIP
     delivery_fee = models.DecimalField(max_digits=6, decimal_places=2, blank=True, null=True)

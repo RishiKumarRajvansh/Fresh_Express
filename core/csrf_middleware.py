@@ -17,7 +17,7 @@ class CustomCSRFMiddleware(MiddlewareMixin):
             if 'CSRF' in str(exception) or 'Forbidden' in str(exception):
                 # If user is not authenticated, redirect to login
                 if not request.user.is_authenticated:
-                    return redirect('accounts:login')
+                    return redirect('accounts:customer_login')
                 else:
                     # If authenticated user, show error message and redirect back
                     return redirect(request.META.get('HTTP_REFERER', '/'))

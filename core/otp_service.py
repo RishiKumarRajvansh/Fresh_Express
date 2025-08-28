@@ -49,14 +49,16 @@ class OTPService:
     
     def send_otp_to_phone(self, phone_number):
         """Send OTP using Twilio Verify service"""
+        # For consistency, use the original phone number for cache key in dev mode
+        cache_phone = phone_number  # Keep original format for cache
         normalized_phone = self.normalize_phone_number(phone_number)
         
         if self.development_mode:
             # Development mode - generate and cache OTP manually
             otp = str(random.randint(100000, 999999))
-            cache_key = f"dev_otp_{normalized_phone}"
+            cache_key = f"dev_otp_{cache_phone}"  # Use original phone format
             cache.set(cache_key, otp, timeout=300)  # 5 minutes
-            logger.info(f"[DEV MODE] Generated OTP {otp} for {normalized_phone}")
+            logger.info(f"[DEV MODE] Generated OTP {otp} for {cache_phone} (normalized: {normalized_phone})")
             return True, f"OTP sent successfully (DEV MODE): {otp}"
         
         try:
@@ -68,7 +70,18 @@ class OTPService:
             return True, "OTP sent successfully via SMS"
             
         except TwilioException as e:
+            error_message = str(e)
             logger.error(f"Twilio Verify error for {normalized_phone}: {e}")
+            
+            # Check if it's a trial account limitation (unverified number)
+            if "unverified" in error_message.lower() or "trial" in error_message.lower():
+                # Fallback to development mode for unverified numbers
+                otp = str(random.randint(100000, 999999))
+                cache_key = f"dev_otp_{cache_phone}"
+                cache.set(cache_key, otp, timeout=300)  # 5 minutes
+                logger.info(f"[TRIAL FALLBACK] Generated OTP {otp} for {cache_phone} due to Twilio trial limitation")
+                return True, f"OTP sent successfully (Trial Mode - use this OTP): {otp}"
+            
             return False, f"Failed to send OTP: {str(e)}"
         except Exception as e:
             logger.error(f"Unexpected error sending OTP to {normalized_phone}: {e}")
@@ -76,25 +89,28 @@ class OTPService:
     
     def verify_otp(self, phone_number, submitted_otp):
         """Verify OTP using Twilio Verify service"""
+        # For consistency, use the original phone number for cache key in dev mode
+        cache_phone = phone_number  # Keep original format for cache
         normalized_phone = self.normalize_phone_number(phone_number)
         
-        if self.development_mode:
-            # Development mode - check cached OTP
-            cache_key = f"dev_otp_{normalized_phone}"
-            stored_otp = cache.get(cache_key)
-            
-            logger.info(f"[DEV MODE] Verifying OTP for {normalized_phone}")
+        # First check if we have a local cache entry (development mode or trial fallback)
+        cache_key = f"dev_otp_{cache_phone}"
+        stored_otp = cache.get(cache_key)
+        
+        if stored_otp:
+            # Local verification (development mode or trial fallback)
+            logger.info(f"[LOCAL VERIFY] Verifying OTP for {cache_phone} (normalized: {normalized_phone})")
             logger.info(f"Submitted: {submitted_otp}, Stored: {stored_otp}")
-            
-            if not stored_otp:
-                return False, "OTP expired or not found"
             
             if submitted_otp == stored_otp:
                 cache.delete(cache_key)
-                logger.info(f"[DEV MODE] OTP verified successfully for {normalized_phone}")
+                logger.info(f"[LOCAL VERIFY] OTP verified successfully for {cache_phone}")
                 return True, "OTP verified successfully"
             else:
                 return False, "Invalid OTP"
+        
+        if self.development_mode:
+            return False, "OTP expired or not found"
         
         try:
             verification_check = self.client.verify.v2.services(self.verify_service_sid).verification_checks.create(

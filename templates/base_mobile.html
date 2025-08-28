@@ -41,8 +41,76 @@
                 <i class="fas fa-drumstick-bite me-2"></i>Fresh Express
             </a>
             
-            <!-- Location Selector -->
-            {% if zip_area %}
+            <!-- Location Selector (hide for store owners/staff and delivery agents) -->
+            {% if not user.is_authenticated %}
+                {% if zip_area %}
+                    {% if selected_zip_code %}
+                <div class="dropdown location-dropdown">
+                    <button class="location-selector me-auto dropdown-toggle" type="button" 
+                            data-bs-toggle="dropdown" aria-expanded="false" id="locationDropdown">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ zip_area.city }} - {{ zip_area.zip_code }}
+                    </button>
+                    <ul class="dropdown-menu location-dropdown-menu">
+                        <li>
+                            <div class="px-3 py-2">
+                                <h6 class="dropdown-header">Change Location</h6>
+                                <form id="zipForm" method="POST" action="{% url 'core:change_zip' %}">
+                                    {% csrf_token %}
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control form-control-sm" 
+                                               name="zip_code" placeholder="Enter ZIP code" 
+                                               id="zipInput" maxlength="6">
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-search me-1"></i>Change Location
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                onclick="getCurrentLocation()">
+                                            <i class="fas fa-crosshairs me-1"></i>Use Current Location
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+            {% elif not is_store_owner and user.user_type != 'store_staff' and not is_delivery_agent %}
+                {% if zip_area %}
+                    {% if selected_zip_code %}
+                <div class="dropdown location-dropdown">
+                    <button class="location-selector me-auto dropdown-toggle" type="button" 
+                            data-bs-toggle="dropdown" aria-expanded="false" id="locationDropdown">
+                        <i class="fas fa-map-marker-alt me-2"></i>{{ zip_area.city }} - {{ zip_area.zip_code }}
+                    </button>
+                    <ul class="dropdown-menu location-dropdown-menu">
+                        <li>
+                            <div class="px-3 py-2">
+                                <h6 class="dropdown-header">Change Location</h6>
+                                <form id="zipForm" method="POST" action="{% url 'core:change_zip' %}">
+                                    {% csrf_token %}
+                                    <div class="mb-2">
+                                        <input type="text" class="form-control form-control-sm" 
+                                               name="zip_code" placeholder="Enter ZIP code" 
+                                               id="zipInput" maxlength="6">
+                                    </div>
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-search me-1"></i>Change Location
+                                        </button>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                onclick="getCurrentLocation()">
+                                            <i class="fas fa-crosshairs me-1"></i>Use Current Location
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                {% endif %}
+            {% endif %}
             <div class="dropdown location-dropdown">
                 <button class="location-selector me-auto dropdown-toggle" type="button" 
                         data-bs-toggle="dropdown" aria-expanded="false" id="locationDropdown">
@@ -73,7 +141,7 @@
                     </li>
                 </ul>
             </div>
-            {% else %}
+                {% else %}
             <div class="dropdown location-dropdown">
                 <button class="location-selector me-auto dropdown-toggle" type="button" 
                         data-bs-toggle="dropdown" aria-expanded="false" id="locationDropdown">
@@ -102,10 +170,10 @@
                             </form>
                             <div class="mt-3 pt-2 border-top">
                                 <div class="d-grid gap-2">
-                                    <a href="{% url 'accounts:login' %}" class="btn btn-outline-success btn-sm">
+                                    <a href="{% url 'accounts:customer_login' %}" class="btn btn-outline-success btn-sm">
                                         <i class="fas fa-sign-in-alt me-1"></i>Login
                                     </a>
-                                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary btn-sm">
+                                    <a href="{% url 'accounts:customer_register' %}" class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-user-plus me-1"></i>Register
                                     </a>
                                 </div>
@@ -114,6 +182,7 @@
                     </li>
                 </ul>
             </div>
+                {% endif %}
             {% endif %}
             
             <!-- Desktop Navigation -->
@@ -197,11 +266,26 @@
                             <li><hr class="dropdown-divider"></li>
                             {% else %}
                             <!-- Customer menu items -->
+                            <li><a class="dropdown-item" href="{% url 'core:customer_dashboard' %}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Customer Dashboard
+                            </a></li>
                             <li><a class="dropdown-item" href="{% url 'orders:order_list' %}">
                                 <i class="fas fa-box me-2"></i>My Orders
                             </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:address_list' %}">
+                                <i class="fas fa-map-marker-alt me-2"></i>My Addresses
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'payments:payment_methods' %}">
+                                <i class="fas fa-credit-card me-2"></i>Payment Methods
+                            </a></li>
                             <li><a class="dropdown-item" href="{% url 'accounts:wishlist' %}">
                                 <i class="fas fa-heart me-2"></i>My Wishlist
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'orders:cart' %}">
+                                <i class="fas fa-shopping-cart me-2"></i>My Cart
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:loyalty_dashboard' %}">
+                                <i class="fas fa-star me-2"></i>Loyalty & Rewards
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% endif %}
@@ -210,7 +294,7 @@
                             <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">
                                 <i class="fas fa-user me-2"></i>Profile
                             </a></li>
-                            <li><a class="dropdown-item" href="/chat/">
+                            <li><a class="dropdown-item" href="{% url 'chat:chat_list' %}">
                                 <i class="fas fa-headset me-2"></i>Support
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
@@ -226,10 +310,10 @@
                     </li>
                     {% else %}
                     <li class="nav-item me-2">
-                        <a class="nav-link" href="{% url 'accounts:phone_login' %}">Login</a>
+                        <a class="nav-link" href="{% url 'accounts:customer_login' %}">Login</a>
                     </li>
                     <li class="nav-item">
-                        <a class="btn btn-light btn-sm" href="{% url 'accounts:phone_register' %}">
+                        <a class="btn btn-light btn-sm" href="{% url 'accounts:customer_register' %}">
                             <i class="fas fa-user-plus me-1"></i>Register
                         </a>
                     </li>
@@ -269,7 +353,7 @@
                     </a>
                 </div>
                 
-                {% elif user.is_authenticated and user.user_type in 'store_owner,store_staff' %}
+                {% elif user.is_authenticated and user.user_type == 'store_owner' or user.user_type == 'store_staff' %}
                 <!-- Store Owner/Staff Bottom Navigation -->
                 <div class="col">
                     <a href="{% url 'stores:dashboard' %}" class="bottom-nav-item">
@@ -338,13 +422,13 @@
                 {% endif %}
                 {% else %}
                 <div class="col">
-                    <a href="{% url 'accounts:phone_login' %}" class="bottom-nav-item">
+                    <a href="{% url 'accounts:customer_login' %}" class="bottom-nav-item">
                         <i class="fas fa-sign-in-alt"></i>
                         <span>Login</span>
                     </a>
                 </div>
                 <div class="col">
-                    <a href="{% url 'accounts:phone_register' %}" class="bottom-nav-item">
+                    <a href="{% url 'accounts:customer_register' %}" class="bottom-nav-item">
                         <i class="fas fa-user-plus"></i>
                         <span>Register</span>
                     </a>
@@ -385,8 +469,8 @@
                             <li><a href="{% url 'orders:order_list' %}" class="text-white-50 text-decoration-none small">My Orders</a></li>
                             <li><a href="{% url 'accounts:address_list' %}" class="text-white-50 text-decoration-none small">Addresses</a></li>
                         {% else %}
-                            <li><a href="{% url 'accounts:phone_login' %}" class="text-white-50 text-decoration-none small">Login</a></li>
-                            <li><a href="{% url 'accounts:phone_register' %}" class="text-white-50 text-decoration-none small">Register</a></li>
+                            <li><a href="{% url 'accounts:customer_login' %}" class="text-white-50 text-decoration-none small">Login</a></li>
+                            <li><a href="{% url 'accounts:customer_register' %}" class="text-white-50 text-decoration-none small">Register</a></li>
                         {% endif %}
                     </ul>
                 </div>

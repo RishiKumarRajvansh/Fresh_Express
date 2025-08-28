@@ -25,13 +25,19 @@
                 <i class="fas fa-fish me-2"></i>FreshMeat
             </a>
             
-            <!-- ZIP Code Display -->
-            {% if selected_zip_code %}
-            <div class="d-flex align-items-center me-3">
-                <i class="fas fa-map-marker-alt text-muted me-1"></i>
-                <small class="text-muted">{{ selected_zip_code }}</small>
-                <a href="{% url 'core:change_zip' %}" class="btn btn-sm btn-outline-primary ms-2">Change</a>
-            </div>
+            <!-- ZIP Code Display: visible to anonymous users and customers only (hide for store owners/staff and delivery agents) -->
+            {% if not user.is_authenticated or (not is_store_owner and user.user_type != 'store_staff' and not is_delivery_agent) %}
+                {% if selected_zip_code %}
+                <div class="d-flex align-items-center me-3">
+                    <i class="fas fa-map-marker-alt text-muted me-1"></i>
+                    <small class="text-muted">{{ selected_zip_code }}</small>
+                    <a href="{% url 'core:change_zip' %}" class="btn btn-sm btn-outline-primary ms-2">Change</a>
+                </div>
+                {% else %}
+                <div class="d-flex align-items-center me-3">
+                    <a href="{% url 'core:zip_capture' %}" class="btn btn-sm btn-outline-primary">Select ZIP Code</a>
+                </div>
+                {% endif %}
             {% endif %}
             
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -77,6 +83,29 @@
                             <i class="fas fa-user me-1"></i>{{ user.get_full_name|default:user.username }}
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="userDropdown">
+                            {% if user.user_type == 'customer' %}
+                            <li><a class="dropdown-item" href="{% url 'core:customer_dashboard' %}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Customer Dashboard
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                                <i class="fas fa-user me-2"></i>Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'orders:order_list' %}">
+                                <i class="fas fa-shopping-bag me-2"></i>My Orders
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:address_list' %}">
+                                <i class="fas fa-map-marker-alt me-2"></i>Addresses
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'payments:payment_methods' %}">
+                                <i class="fas fa-credit-card me-2"></i>Payment Methods
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'accounts:wishlist' %}">
+                                <i class="fas fa-heart me-2"></i>My Wishlist
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'orders:cart' %}">
+                                <i class="fas fa-shopping-cart me-2"></i>My Cart
+                            </a></li>
+                            {% else %}
                             <li><a class="dropdown-item" href="{% url 'core:dashboard_router' %}">
                                 <i class="fas fa-tachometer-alt me-2"></i>Dashboard
                             </a></li>
@@ -86,18 +115,14 @@
                             <li><a class="dropdown-item" href="{% url 'orders:order_list' %}">
                                 <i class="fas fa-shopping-bag me-2"></i>My Orders
                             </a></li>
-                            {% if user.user_type == 'customer' %}
-                            <li><a class="dropdown-item" href="{% url 'accounts:address_list' %}">
-                                <i class="fas fa-map-marker-alt me-2"></i>Addresses
-                            </a></li>
-                            <li><a class="dropdown-item" href="{% url 'payments:payment_methods' %}">
-                                <i class="fas fa-credit-card me-2"></i>Payment Methods
-                            </a></li>
                             {% endif %}
                             
-                            {% if user.user_type == 'customer' and user.loyalty_account %}
+                            {% if user.user_type == 'customer' %}
                             <li><a class="dropdown-item" href="{% url 'accounts:loyalty_dashboard' %}">
                                 <i class="fas fa-star me-2"></i>Loyalty & Rewards
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'chat:chat_list' %}">
+                                <i class="fas fa-headset me-2"></i>Support & Help
                             </a></li>
                             {% endif %}
                             
@@ -118,6 +143,9 @@
                             {% if user.user_type == 'delivery_agent' %}
                             <li><hr class="dropdown-divider"></li>
                             <li><h6 class="dropdown-header">Delivery</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'delivery:agent_profile_new' %}">
+                                <i class="fas fa-user-circle me-2"></i>Agent Profile
+                            </a></li>
                             <li><a class="dropdown-item" href="{% url 'delivery:agent_dashboard' %}">
                                 <i class="fas fa-motorcycle me-2"></i>Delivery Dashboard
                             </a></li>
@@ -150,10 +178,10 @@
                     </li>
                     {% else %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'accounts:phone_login' %}">Login</a>
+                        <a class="nav-link" href="{% url 'accounts:customer_login' %}">Login</a>
                     </li>
                     <li class="nav-item">
-                        <a class="btn btn-primary btn-sm" href="{% url 'accounts:phone_register' %}">Register</a>
+                        <a class="btn btn-primary btn-sm" href="{% url 'accounts:customer_register' %}">Register</a>
                     </li>
                     {% endif %}
                 </ul>

@@ -25,6 +25,10 @@ ALLOWED_HOSTS = [
     'www.yourdomain.com',
 ]
 
+# Allow overriding via environment variable (comma-separated)
+if os.environ.get('DJANGO_ALLOWED_HOSTS'):
+    ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS').split(',')
+
 # Application definition
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -50,6 +54,7 @@ LOCAL_APPS = [
     'catalog',
     'orders',
     'delivery',
+    'locations',
     'chat',
     'payments',
 ]
@@ -185,9 +190,9 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
 # HTTPS Settings (uncomment when using HTTPS)
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
+SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True').lower() in ('1', 'true', 'yes')
+SESSION_COOKIE_SECURE = os.environ.get('SESSION_COOKIE_SECURE', 'True').lower() in ('1', 'true', 'yes')
+CSRF_COOKIE_SECURE = os.environ.get('CSRF_COOKIE_SECURE', 'True').lower() in ('1', 'true', 'yes')
 
 # Session Configuration
 SESSION_COOKIE_AGE = 1209600  # 2 weeks
@@ -195,7 +200,14 @@ SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # CSRF Configuration
-CSRF_COOKIE_HTTPONLY = True
+# By default do NOT set CSRF_COOKIE_HTTPONLY to True because some JS code reads
+# the CSRF token from cookies for AJAX requests. If your deployment does not
+# rely on JS-read CSRF, you can set this to True for additional defence.
+CSRF_COOKIE_HTTPONLY = os.environ.get('CSRF_COOKIE_HTTPONLY', 'False').lower() in ('1', 'true', 'yes')
+
+# Ensure CSRF cookie name/age can be tuned via env
+CSRF_COOKIE_NAME = os.environ.get('CSRF_COOKIE_NAME', 'csrftoken')
+CSRF_COOKIE_AGE = int(os.environ.get('CSRF_COOKIE_AGE', '31449600'))  # Default ~1 year
 
 # Logging Configuration
 LOGGING = {

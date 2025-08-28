@@ -78,8 +78,8 @@
                         
                         <!-- Wishlist Button -->
                         {% if user.is_authenticated %}
-                        <button class="wishlist-btn {% if store_product.id in wishlist_items %}active{% endif %}" 
-                                data-store-product-id="{{ store_product.id }}">
+            <button class="wishlist-btn {% if store_product.id in wishlist_items %}active{% endif %}" 
+                data-store-product-id="{{ store_product.id }}" data-wishlist-bound="1">
                             <i class="{% if store_product.id in wishlist_items %}fas{% else %}far{% endif %} fa-heart"></i>
                         </button>
                         {% endif %}
@@ -295,41 +295,27 @@ function toggleWishlist(storeProductId) {
     });
 }
 
+// Use centralized wishlist module binding
 function initializeCatalogWishlist() {
-    document.querySelectorAll('.wishlist-btn').forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const storeProductId = this.dataset.storeProductId;
-            
-            if (!storeProductId) {
-                return;
-            }
-            
-            toggleWishlist(storeProductId);
-        });
-    });
+    if (window.WishlistModule && typeof window.WishlistModule.bind === 'function') {
+        window.WishlistModule.bind(document);
+    }
 }
 
 // Toast notification function
-function
-    toast.className = `toast show position-fixed top-0 end-0 m-3`;
+function showToast(message, type='info') {
+    const toast = document.createElement('div');
+    toast.className = 'toast show position-fixed top-0 end-0 m-3';
     toast.style.zIndex = '9999';
     toast.innerHTML = `
-        <div class="toast-header bg-${type === 'success' ? 'success' : 'danger'} text-white">
-            <strong class="me-auto">${type === 'success' ? 'Success' : 'Error'}</strong>
+        <div class="toast-header ${type === 'success' ? 'bg-success text-white' : type === 'error' ? 'bg-danger text-white' : 'bg-secondary text-white'}">
+            <strong class="me-auto">${type === 'success' ? 'Success' : type === 'error' ? 'Error' : 'Notice'}</strong>
             <button type="button" class="btn-close btn-close-white" onclick="this.closest('.toast').remove()"></button>
         </div>
         <div class="toast-body">${message}</div>
     `;
     document.body.appendChild(toast);
-    
-    // Auto remove after 3 seconds
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.remove();
-        }
-    }, 3000);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
 }
 
 // Get CSRF token

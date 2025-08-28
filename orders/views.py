@@ -8,6 +8,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+import logging
 import json
 from decimal import Decimal
 
@@ -124,11 +125,36 @@ def add_to_cart_view(request):
         }, status=405)
     
     try:
-        # Handle both JSON and form data
-        if request.content_type == 'application/json':
-            data = json.loads(request.body)
-        else:
-            data = request.POST
+        # Quick stdout trace to ensure server sees the request in development console
+        try:
+            print('ADD_TO_CART_VIEW_HIT', request.method, request.path, 'CONTENT_TYPE=', request.META.get('CONTENT_TYPE'), 'COOKIES=', list(getattr(request, 'COOKIES', {}).keys()))
+        except Exception:
+            pass
+        # Handle both JSON and form data. Accept content types like
+        # 'application/json; charset=UTF-8' by checking startswith.
+        content_type = (request.content_type or '')
+        logger = logging.getLogger('django.request')
+        try:
+            if content_type.startswith('application/json'):
+                raw_body = request.body.decode('utf-8') if request.body else ''
+                data = json.loads(raw_body) if raw_body else {}
+            else:
+                data = request.POST
+        finally:
+            # Log content type and parsed data for debugging
+            try:
+                    # Log headers, cookies and small preview of body to help debug AJAX issues
+                    cookie_keys = list(request.COOKIES.keys()) if hasattr(request, 'COOKIES') else []
+                    logger.debug(f"add_to_cart_view: content_type={content_type}, cookie_keys={cookie_keys}, parsed_data={data}")
+                    logger.debug(f"add_to_cart_view: user_authenticated={getattr(request.user, 'is_authenticated', False)}")
+                    # Also log a short preview of raw body for debugging
+                    try:
+                        preview = (raw_body[:1000] + '...') if raw_body and len(raw_body) > 1000 else (raw_body or '')
+                        logger.debug(f"add_to_cart_view: raw_body_preview={preview}")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
             
         store_product_id = data.get('store_product_id')
         quantity = int(data.get('quantity', 1))
@@ -136,16 +162,29 @@ def add_to_cart_view(request):
         if not store_product_id:
             return JsonResponse({
                 'success': False,
-                'message': 'Product ID is required'
+                'message': 'Product ID is required',
+                'debug': {
+                    'parsed_data': data,
+                    'parsed_data_keys': list(data.keys()) if hasattr(data, 'keys') else []
+                }
             })
         
         store_product = get_object_or_404(StoreProduct, id=store_product_id)
         
         if not request.user.is_authenticated:
-            return JsonResponse({
+            # Provide helpful debug info to the frontend so developer can see whether
+            # the session cookie was received by the server. Do NOT include cookie values.
+            debug_info = {
                 'success': False,
-                'message': 'Please login to add items to cart'
-            })
+                'message': 'Please login to add items to cart',
+                'debug': {
+                    'user_is_authenticated': False,
+                    'cookie_keys': list(request.COOKIES.keys()) if hasattr(request, 'COOKIES') else [],
+                    'content_type': content_type,
+                    'parsed_data_keys': list(data.keys()) if hasattr(data, 'keys') else []
+                }
+            }
+            return JsonResponse(debug_info)
         
         # Check if product is available
         if not store_product.is_available:
@@ -206,8 +245,10 @@ def add_to_cart_view(request):
         })
             
     except Exception as e:
-                return JsonResponse({
-            'success': False
+        # Include the exception message to help debug frontend failures
+        return JsonResponse({
+            'success': False,
+            'message': str(e)
         })
 
 # DISABLED - Using function-based view instead
@@ -452,6 +493,12 @@ class CheckoutView(LoginRequiredMixin, TemplateView):
             for cart in carts:
                 # Calculate order totals
                 subtotal = cart.subtotal
+                # Prevent order creation if the store is closed
+                if cart.store.status != 'open':
+                    # Return the user to cart with an error message
+                    from django.contrib import messages
+                    messages.error(request, f"Store '{cart.store.name}' is currently closed and cannot accept orders.")
+                    return redirect('orders:cart')
                 delivery_fee = Decimal('0.00')  # Free delivery for now
                 tax_amount = Decimal('0.00')   # No tax for now
                 discount_amount = Decimal('0.00')  # No discount for now

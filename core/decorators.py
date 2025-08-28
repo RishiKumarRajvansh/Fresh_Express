@@ -45,7 +45,7 @@ class StoreRequiredMixin:
     """
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('accounts:login')
+            return redirect('accounts:email_login')
         
         if request.user.user_type not in ['store_owner', 'store_staff']:
             return redirect('core:home')
@@ -58,7 +58,7 @@ class DeliveryAgentRequiredMixin:
     """
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('accounts:login')
+            return redirect('accounts:email_login')
         
         if request.user.user_type != 'delivery_agent':
             return redirect('core:home')
@@ -71,7 +71,7 @@ class AdminRequiredMixin:
     """
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('accounts:login')
+            return redirect('accounts:email_login')
         
         if not request.user.is_staff and request.user.user_type != 'admin':
             return redirect('core:home')

@@ -74,7 +74,7 @@ class InventorySyncService:
         ).select_related('store')
         
         if zip_area:
-            query = query.filter(store__storezipcoverage__zip_area=zip_area)
+            query = query.filter(store__zip_coverages__zip_area=zip_area)
         
         inventory_data = []
         for sp in query:

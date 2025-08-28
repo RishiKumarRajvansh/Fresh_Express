@@ -205,7 +205,8 @@
 <script>
 async function updateQuantity(itemId, newQuantity) {
     try {
-        const response = await fetch('/orders/cart/update/', {
+    console.debug('cart.updateQuantity: sending POST', {cart_item_id: itemId, quantity: newQuantity});
+    const response = await fetch('/orders/cart/update/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -234,6 +235,7 @@ async function updateQuantity(itemId, newQuantity) {
 async function removeItem(itemId) {
     if (confirm('Remove this item from cart?')) {
         try {
+            console.debug('cart.removeItem: sending POST', {cart_item_id: itemId});
             const response = await fetch('/orders/cart/remove/', {
                 method: 'POST',
                 headers: {
@@ -263,7 +265,8 @@ async function removeItem(itemId) {
 async function clearCart() {
     if (confirm('Clear all items from cart?')) {
         try {
-            const response = await fetch('/orders/cart/clear/', {
+        console.debug('cart.clearCart: sending POST');
+        const response = await fetch('/orders/cart/clear/', {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
@@ -284,30 +287,21 @@ function continueShopping() {
     window.history.back();
 }
 
-function
-    toast.className = `toast align-items-center text-bg-${type === 'danger' ? 'danger' : type === 'success' ? 'success' : 'info'} border-0 position-fixed`;
+function showToast(message, type='info') {
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center ${type === 'danger' ? 'text-bg-danger' : type === 'success' ? 'text-bg-success' : 'text-bg-info'} border-0 position-fixed`;
     toast.style.top = '20px';
     toast.style.right = '20px';
     toast.style.zIndex = '9999';
     toast.style.minWidth = '300px';
-    
     toast.innerHTML = `
         <div class="d-flex">
-            <div class="toast-body">
-                ${message}
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.parentElement.parentElement.remove()"></button>
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" onclick="this.closest('.toast').remove()"></button>
         </div>
     `;
-    
     document.body.appendChild(toast);
-    
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-    }, 5000);
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
 }
 </script>
 

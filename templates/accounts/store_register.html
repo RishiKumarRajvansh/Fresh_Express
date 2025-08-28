@@ -182,16 +182,8 @@
             
             <!-- Business Information -->
             <div class="form-row">
-                <select name="store_type" class="form-control form-control-custom" required>
-                    <option value="">Store Type *</option>
-                    <option value="meat_shop">Meat Shop</option>
-                    <option value="seafood_market">Seafood Market</option>
-                    <option value="butcher_shop">Butcher Shop</option>
-                    <option value="specialty_store">Specialty Store</option>
-                    <option value="supermarket">Supermarket</option>
-                </select>
                 <input type="text" name="gst_number" class="form-control form-control-custom" 
-                       placeholder="GST Number (Optional)">
+                       placeholder="GST Number (Optional)" style="width: 100%;">
             </div>
             
             <!-- Additional Information -->
@@ -216,7 +208,7 @@
 
         <div class="auth-links">
             <p>Already have an account? <a href="{% url 'accounts:email_login' %}?type=store">Store Login</a></p>
-            <p>Customer? <a href="{% url 'accounts:phone_login' %}">Customer Login</a></p>
+            <p>Customer? <a href="{% url 'accounts:customer_login' %}">Customer Login</a></p>
         </div>
     </div>
 </div>
