@@ -418,9 +418,6 @@
 
     /* Desktop Styles */
     @media (min-width: 768px) {
-        .status-bar {
-            display: none;
-        }
 
         .navbar-custom {
             padding: 30px 0 !important;
@@ -578,7 +575,7 @@
                     <!-- Wishlist Button - Only for customers -->
                     {% if user.is_authenticated and is_customer %}
                     <button class="wishlist-btn {% if product.id in wishlist_items %}active{% endif %}" 
-                                data-store-product-id="{{ product.id }}" data-wishlist-bound="1">
+                                data-store-product-id="{{ product.id }}">
                         <i class="{% if product.id in wishlist_items %}fas{% else %}far{% endif %} fa-heart"></i>
                     </button>
                     {% endif %}

@@ -330,23 +330,32 @@ main {
 /* Cart Badge */
 .cart-badge {
     background-color: var(--appetite-red) !important;
-    color: var(--text-inverse);
-    font-size: 0.75rem;
-    min-width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    display: flex;
+    color: var(--text-inverse) !important;
+    font-size: 0.65rem;
+    min-width: 20px;
+    padding: 0 6px;
+    height: 20px;
+    border-radius: 999px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
     border: 2px solid var(--text-inverse);
     line-height: 1;
-    padding: 0;
+    white-space: nowrap;
     position: absolute !important;
-    top: -5px !important;
-    right: -5px !important;
-    z-index: 1000;
+    top: 0 !important;
+    right: 0!important;
+    transform: translate(25%, -25%);
+    z-index: 1100;
+}
+
+@media(max-width:991px){
+    .cart-badge{
+        top: 9px !important;
+        right: 24px !important;
+    }
 }
 
 /* Bootstrap badge positioning fix for cart - IMPROVED VISIBILITY */
@@ -633,6 +642,19 @@ footer .text-white-50:hover {
     z-index: 1000;
     display: flex;
     flex-direction: column;
+}
+
+/* Hide global footer on mobile to declutter small screens */
+@media (max-width: 991.98px) {
+    footer,
+    .modern-footer {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+    }
 }
 
 .chat-header {

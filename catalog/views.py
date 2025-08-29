@@ -358,38 +358,125 @@ class ProductDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         store_product = self.get_object()
-        
+
+        # If we found a StoreProduct (product available in selected area), expose detailed context
         if store_product:
+            # Provide both the Product and StoreProduct objects to the template
+            context['store_product'] = store_product
+            context['product'] = store_product.product
+
             selected_zip = self.request.session.get('selected_zip_code')
-            available_stores = Store.objects.filter(
+            stores_in_area = Store.objects.filter(
                 zip_code=selected_zip,
                 is_active=True,
                 status='open'
             )
-            
-            # Get all available options for this product from different stores
-            context['product_options'] = StoreProduct.objects.filter(
-                store__in=available_stores,
+
+            # Get all available StoreProduct options for this product from different stores
+            available_store_products = StoreProduct.objects.filter(
+                store__in=stores_in_area,
                 product=store_product.product,
                 is_available=True
             ).select_related('store').order_by('price')
-            
+
+            context['available_stores'] = available_store_products
+            context['product_options'] = available_store_products
+
+            # Derive availability from store-specific data (prefer store_product first)
+            try:
+                context['is_available'] = bool(
+                    store_product.availability_status == 'in_stock' and store_product.stock_quantity > 0
+                )
+            except Exception:
+                context['is_available'] = False
+
+            # Minimum price among available store options (if any)
+            first_opt = available_store_products.first()
+            context['min_price'] = first_opt.price if first_opt else None
+            # Debugging: log key values to help trace availability issues
+            try:
+                print('PRODUCT_DETAIL_DEBUG', 'slug=', store_product.product.slug, 'selected_zip=', selected_zip,
+                      'store_product_id=', store_product.id, 'stock=', getattr(store_product, 'stock_quantity', None),
+                      'availability=', getattr(store_product, 'availability_status', None))
+            except Exception:
+                pass
+
             # Get related products from all stores in the area
             context['related_products'] = StoreProduct.objects.filter(
-                store__in=available_stores,
+                store__in=stores_in_area,
                 product__category=store_product.product.category,
                 is_available=True
             ).exclude(product=store_product.product).select_related('product', 'store')[:4]
-            
+
             # Get frequently bought together from all stores
             context['frequently_bought'] = StoreProduct.objects.filter(
-                store__in=available_stores,
+                store__in=stores_in_area,
                 is_available=True,
                 product__category__in=[
                     store_product.product.category,
                 ]
             ).exclude(product=store_product.product).select_related('product', 'store')[:3]
-        
+        else:
+            # Fallback: try to render product-level information even if no StoreProduct is available
+            product_slug = self.kwargs.get('product_slug')
+            try:
+                product = Product.objects.get(slug=product_slug)
+                context['product'] = product
+            except Product.DoesNotExist:
+                context['product'] = None
+
+            # No specific store_product; show any available store options for this product (ignoring zip)
+            try:
+                available_store_products = StoreProduct.objects.filter(
+                    product__slug=product_slug,
+                    is_available=True
+                ).select_related('store', 'product').order_by('price')
+                context['available_stores'] = available_store_products
+                context['product_options'] = available_store_products
+            except Exception:
+                available_store_products = StoreProduct.objects.none()
+                context['available_stores'] = StoreProduct.objects.none()
+                context['product_options'] = StoreProduct.objects.none()
+
+            # Derive availability by checking store options (ignore zip)
+            try:
+                context['is_available'] = available_store_products.filter(
+                    availability_status='in_stock',
+                    stock_quantity__gt=0
+                ).exists()
+            except Exception:
+                context['is_available'] = False
+
+            # Minimum price among these store options
+            first_opt = available_store_products.first() if hasattr(available_store_products, 'first') else None
+            context['min_price'] = first_opt.price if first_opt else None
+            # Debugging: log fallback values
+            try:
+                print('PRODUCT_DETAIL_DEBUG_FALLBACK', 'slug=', product_slug,
+                      'selected_zip=', self.request.session.get('selected_zip_code'),
+                      'available_count=', available_store_products.count(),
+                      'sample=', [
+                          (p.id, getattr(p, 'stock_quantity', None), getattr(p, 'availability_status', None), getattr(p, 'price', None))
+                          for p in available_store_products[:3]
+                      ])
+            except Exception:
+                pass
+
+            # Related/frequently bought based on product (if available)
+            if context.get('product'):
+                context['related_products'] = StoreProduct.objects.filter(
+                    product__category=context['product'].category,
+                    is_available=True
+                ).exclude(product=context['product']).select_related('product', 'store')[:4]
+
+                context['frequently_bought'] = StoreProduct.objects.filter(
+                    product__category=context['product'].category,
+                    is_available=True
+                ).exclude(product=context['product']).select_related('product', 'store')[:3]
+            else:
+                context['related_products'] = StoreProduct.objects.none()
+                context['frequently_bought'] = StoreProduct.objects.none()
+
         return context
 
 class ProductReviewsView(ListView):

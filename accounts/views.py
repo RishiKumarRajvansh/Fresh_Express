@@ -133,20 +133,26 @@ class AddAddressView(LoginRequiredMixin, FormView):
             is_default=form.cleaned_data.get('is_default', False)
         )
         if self.request.GET.get('next') == 'checkout':
-            # The 'orders:checkout' URL may require a store_code argument in some setups.
-            # Try to resolve it; if it fails, fall back to the cart page to avoid a crash.
+            # The 'orders:checkout' URL requires a store_code argument.
+            # Get it from the user's active cart.
             try:
                 from django.urls import reverse
-                from django.urls.exceptions import NoReverseMatch
-
-                try:
-                    checkout_url = reverse('orders:checkout')
+                from orders.models import Cart
+                
+                # Get the user's active cart with items
+                cart = Cart.objects.filter(
+                    user=self.request.user, 
+                    is_active=True
+                ).prefetch_related('items').filter(items__isnull=False).first()
+                
+                if cart:
+                    checkout_url = reverse('orders:checkout', kwargs={'store_code': cart.store.store_code})
                     return redirect(checkout_url)
-                except NoReverseMatch:
-                    # Fallback: redirect to cart if checkout requires a store_code
+                else:
+                    # No active cart with items, redirect to cart page
                     return redirect('orders:cart')
             except Exception:
-                # As a last-resort fallback, redirect to cart
+                # Fallback: redirect to cart if anything goes wrong
                 return redirect('orders:cart')
         return super().form_valid(form)
 

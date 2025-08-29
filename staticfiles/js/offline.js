@@ -123,26 +123,45 @@ class PWAManager {
     }
     
     updateUIForConnectivity() {
-        const offlineIndicator = document.getElementById('offline-indicator');
-        const body = document.body;
-        
-        if (this.isOnline) {
-            body.classList.remove('offline-mode');
-            if (offlineIndicator) {
-                offlineIndicator.style.display = 'none';
-            }
-        } else {
-            body.classList.add('offline-mode');
-            if (offlineIndicator) {
-                offlineIndicator.style.display = 'block';
-                offlineIndicator.innerHTML = `
-                    <div class="offline-banner">
-                        <i class="fas fa-wifi-slash"></i>
-                        <span>You're offline. Changes will sync when connection is restored.</span>
-                    </div>
-                `;
-            }
+    // Show a compact inline SVG network-status indicator when offline; remove when online
+    this._updateNetworkStatusIndicator(this.isOnline);
+    _updateNetworkStatusIndicator(isOnline) {
+        const id = 'network-status-indicator';
+        let el = document.getElementById(id);
+
+        if (isOnline) {
+            if (el && el.parentNode) el.parentNode.removeChild(el);
+            return;
         }
+
+        if (!el) {
+            el = document.createElement('div');
+            el.id = id;
+            el.setAttribute('aria-live', 'polite');
+            el.style.position = 'fixed';
+            el.style.top = '8px';
+            el.style.right = '8px';
+            el.style.zIndex = '2000';
+            el.style.background = 'rgba(0,0,0,0.7)';
+            el.style.color = '#fff';
+            el.style.padding = '6px 10px';
+            el.style.borderRadius = '18px';
+            el.style.fontSize = '13px';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.gap = '8px';
+            el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+            el.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M12 3C7.03 3 2.53 5.11 0 8.5L2.5 11C4.43 8.72 8.02 7 12 7s7.57 1.72 9.5 4.0L24 8.5C21.47 5.11 16.97 3 12 3z" fill="#FFB74D" />
+                    <path d="M12 10c-2.76 0-5 2.24-5 5h2a3 3 0 116 0h2c0-2.76-2.24-5-5-5z" fill="#FFB74D" />
+                    <circle cx="12" cy="18" r="2" fill="#FF7043" />
+                </svg>
+                <span>You're offline</span>
+            `;
+            document.body.appendChild(el);
+        }
+    }
         
         // Update form behaviors
         this.updateFormBehaviors();

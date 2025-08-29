@@ -56,35 +56,7 @@
    MODERN NAVIGATION SYSTEM
    ================================================ */
 
-/* Mobile Status Bar */
-.status-bar {
-    background: var(--gradient-primary);
-    height: 44px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 20px;
-    color: var(--text-inverse);
-    font-size: 14px;
-    font-weight: 500;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-}
-
-.status-time {
-    font-weight: 600;
-}
-
-.status-indicators {
-    display: flex;
-    gap: 8px;
-}
-
-.status-indicators i {
-    font-size: 12px;
-    opacity: 0.9;
-}
+/* Mobile Status Bar rules removed: fake time/signal/wifi/battery UI intentionally omitted */
 
 /* Modern Navbar */
 .modern-navbar {
@@ -230,7 +202,7 @@ main {
     font-weight: 600;
     transition: all 0.3s ease;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
-    padding: 0.5rem 1rem !important;
+    padding: 0.75rem 1rem !important; /* increased vertical padding to avoid badge clipping */
 }
 
 .navbar-nav .nav-link:hover {
@@ -464,17 +436,31 @@ main {
 /* Cart Badge */
 .cart-badge {
     background-color: var(--appetite-red) !important;
-    color: var(--text-inverse);
-    font-size: 0.75rem;
-    min-width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    display: flex;
+    color: var(--text-inverse) !important;
+    font-size: 0.65rem;
+    min-width: 20px;
+    padding: 0 6px; /* allow two-digit counts */
+    height: 20px;
+    border-radius: 999px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
     border: 2px solid var(--text-inverse);
+    position: absolute;
+    top: 0;
+    right: 0;
+    transform: translate(25%, -25%);
+    z-index: 1100;
+    white-space: nowrap;
+}
+
+/* Slightly different placement for the mobile bottom nav */
+.bottom-nav-item .cart-badge {
+    top: 6px;
+    right: 10px;
+    transform: none;
 }
 
 /* Search Bar Styling */
@@ -1093,6 +1079,10 @@ footer .text-white-50:hover {
     position: relative;
 }
 
+
+    .bottom-nav-item {
+        padding-top: 6px; /* extra space to prevent badge overlap */
+    }
 .bottom-nav-item:hover,
 .bottom-nav-item.active {
     color: var(--primary-blue);

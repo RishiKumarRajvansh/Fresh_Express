@@ -130,14 +130,12 @@
 .cart-counter, .cart-badge {
     background-color: var(--cta-color);
     color: white;
-    border-radius: 50%;
-    font-size: 0.75rem;
+    border-radius: 999px;
     font-weight: bold;
-    min-width: 20px;
-    height: 20px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    white-space: nowrap;
 }
 
 .add-to-cart-btn {
