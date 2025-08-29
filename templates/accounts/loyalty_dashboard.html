@@ -184,9 +184,13 @@ function redeemReward(rewardId) {
         if (data.success) {
             location.reload();
         } else {
+            // show error to user when redemption fails
+            alert(data.error || 'Unable to redeem reward at this time.');
         }
     })
     .catch(error => {
+        console.error('Redeem request failed', error);
+        alert('Network error while redeeming reward. Please try again.');
     });
 }
 

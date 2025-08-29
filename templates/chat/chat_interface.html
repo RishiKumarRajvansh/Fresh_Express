@@ -317,6 +317,9 @@ const messageForm = document.getElementById('messageForm');
 const messageInput = document.getElementById('messageInput');
 const typingIndicator = document.getElementById('typingIndicator');
 
+// Redirect URL to use when ending chat (resolved server-side)
+const END_CHAT_REDIRECT = '{% if is_order_support %}{% url "orders:order_detail" order.order_number %}{% else %}{% url "core:home" %}{% endif %}';
+
 // Auto-scroll to bottom
 function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -407,11 +410,8 @@ function refreshChat() {
 function endChat() {
     if (confirm('Are you sure you want to end this chat session?')) {
         // TODO: Implement chat ending logic
-        {% if is_order_support %}
-        window.location.href = "{% url 'orders:order_detail' order.order_number %}";
-        {% else %}
-        window.location.href = "{% url 'core:home' %}";
-        {% endif %}
+    // Redirect to appropriate page (server-side resolved)
+    window.location.href = END_CHAT_REDIRECT;
     }
 }
 

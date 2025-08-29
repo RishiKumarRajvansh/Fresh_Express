@@ -267,8 +267,8 @@ function selectStore(storeId) {
 
 async function addToCart(storeProductId) {
     try {
-    console.debug('detail.addToCart: sending POST', {store_product_id: storeProductId});
-    const response = await fetch('/orders/cart/add/', {
+        console.debug('detail.addToCart: sending POST', { store_product_id: storeProductId });
+        const response = await fetch('/orders/cart/add/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -282,15 +282,18 @@ async function addToCart(storeProductId) {
         });
 
         const data = await response.json();
-        
+
         if (data.success) {
             updateCartCount(data.cart_count);
-            
             // Refresh page to show quantity controls
             setTimeout(() => location.reload(), 1000);
         } else {
+            console.error('Error adding to cart:', data.message || data);
+            alert(data.message || 'Could not add to cart.');
         }
     } catch (error) {
+        console.error('Error in addToCart:', error);
+        alert('Network error. Please try again.');
     }
 }
 
@@ -309,15 +312,18 @@ async function updateCartQuantity(cartItemId, newQuantity) {
         });
 
         const data = await response.json();
-        
+
         if (data.success) {
             updateCartCount(data.cart_count);
-            
             // Refresh page to update quantity display
             setTimeout(() => location.reload(), 1000);
         } else {
+            console.error('Error updating cart quantity:', data.message || data);
+            alert(data.message || 'Could not update cart.');
         }
     } catch (error) {
+        console.error('Error in updateCartQuantity:', error);
+        alert('Network error. Please try again.');
     }
 }
 

@@ -125,9 +125,9 @@ class PWAManager {
     updateUIForConnectivity() {
     // Show a compact inline SVG network-status indicator when offline; remove when online
     this._updateNetworkStatusIndicator(this.isOnline);
-        
-        // Update form behaviors
-        this.updateFormBehaviors();
+
+    // Update form behaviors
+    this.updateFormBehaviors();
     }
 
     _updateNetworkStatusIndicator(isOnline) {
@@ -480,7 +480,7 @@ class PWAManager {
         
         // Show notification for low stock
         if (stock_quantity <= 5 && stock_quantity > 0) {
-            this.
+            this.showConnectionStatus(`Low stock (${stock_quantity}) for product ${product_id}`, 'warning');
         }
     }
     
@@ -528,7 +528,7 @@ class PWAManager {
         
         // Show notification for important updates
         if (status === 'Out for Delivery' || status === 'Delivered') {
-            this.
+            this.showConnectionStatus(`Order ${order_id} is now ${status}`, 'info');
         }
         
         // Add to order timeline
@@ -582,8 +582,6 @@ class PWAManager {
     extractDeliveryIdFromUrl() {
         const match = window.location.pathname.match(/\/delivery\/track\/(\d+)\//);
         return match ? match[1] : null;
-    }
-        }
     }
     
     showConnectionStatus(message, type = 'info') {

@@ -66,7 +66,7 @@
             <!-- Products Grid using Global Product Card -->
             <div class="global-product-grid category-grid">
                 {% for store_product in products %}
-                <div class="global-product-card" data-product-url="{% url 'catalog:product_detail' store_product.product.slug %}">
+                <div class="global-product-card" data-product-url="{% url \"catalog:product_detail\" store_product.product.slug %}">
                     <div class="product-image">
                         {% if store_product.product.image %}
                         <img src="{{ store_product.product.image.url }}" alt="{{ store_product.product.name }}">
@@ -100,7 +100,7 @@
                         {% endif %}
                     </div>
                     
-                    <div class="product-content" onclick="window.location.href='{% url 'catalog:product_detail' store_product.product.slug %}';" style="cursor: pointer;">
+                    <div class="product-content" onclick="navigateToProduct(this)" style="cursor: pointer;" data-product-url="{% url 'catalog:product_detail' store_product.product.slug %}">
                         <div class="product-title">{{ store_product.product.name }}</div>
                         
                         <div class="product-description">{{ store_product.product.description|truncatewords:12 }}</div>
@@ -175,8 +175,8 @@
             </div>
             {% endif %}
 
-            {% else %}
-            <div class="text-center py-5">
+                {% else %}
+                <div class="text-center py-5">
                 <i class="fas fa-box-open fa-4x text-muted mb-3"></i>
                 <h4>No Products Found</h4>
                 {% if search_query %}
@@ -184,7 +184,7 @@
                 <a href="{% url 'catalog:product_list' %}" class="btn btn-success">View All Products</a>
                 {% elif not selected_store %}
                 <p class="text-muted">Please select a ZIP code to view products</p>
-                <a href="{% url 'core:zip_capture' %}" class="btn btn-success">Select ZIP Code</a>
+                <!-- Header location selector will guide the user to set ZIP. -->
                 {% else %}
                 <p class="text-muted">{{ selected_store.name }} doesn't have any products available right now.</p>
                 {% endif %}
@@ -332,6 +332,13 @@ function getCookie(name) {
         }
     }
     return cookieValue;
+}
+
+// Navigation helper used by product-content clickable area
+function navigateToProduct(el) {
+    if (!el) return;
+    const url = el.getAttribute('data-product-url') || (el.closest ? el.closest('.global-product-card')?.getAttribute('data-product-url') : null);
+    if (url) window.location.href = url;
 }
 </script>
 {% endblock %}

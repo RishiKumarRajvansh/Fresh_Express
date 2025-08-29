@@ -356,12 +356,17 @@ function toggleWishlist(storeProductId, element) {
 }
 
 function addToCart(productId) {
-    console.debug('wishlist.addToCart: sending POST', {store_product_id: productId});
+    console.debug('wishlist.addToCart: sending POST', { store_product_id: productId });
+
+    // Find the button associated with this product card
+    const button = document.querySelector(`.product-card[data-product-id='${productId}'] .btn-add-to-cart`);
+    const originalText = button ? button.innerHTML : null;
+
     fetch('/orders/cart/add/', {
         method: 'POST',
         headers: {
             'X-CSRFToken': (document.cookie.match(new RegExp('(^| )csrftoken=([^;]+)')) || [])[2],
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
         },
         credentials: 'same-origin',
         body: JSON.stringify({
@@ -372,21 +377,25 @@ function addToCart(productId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-                        const button = event.target.closest('.btn-add-to-cart');
-            const originalText = button.innerHTML;
-            button.innerHTML = '<i class="fas fa-check me-2"></i>Added!';
-            button.style.background = '#27ae60';
-            
-            setTimeout(() => {
-                button.innerHTML = originalText;
-                button.style.background = '';
-            }, 2000);
+            if (button) {
+                button.innerHTML = '<i class="fas fa-check me-2"></i>Added!';
+                button.style.background = '#27ae60';
+
+                setTimeout(() => {
+                    if (button) {
+                        button.innerHTML = originalText;
+                        button.style.background = '';
+                    }
+                }, 2000);
+            }
         } else {
             console.error('Error adding to cart:', data.message);
+            if (button && originalText !== null) button.innerHTML = originalText;
         }
     })
     .catch(error => {
         console.error('Error:', error);
+        if (button && originalText !== null) button.innerHTML = originalText;
     });
 }
 

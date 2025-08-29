@@ -1,6 +1,7 @@
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.http import Http404
+import logging
 
 
 class UserTypeAccessMiddleware:
@@ -16,15 +17,22 @@ class UserTypeAccessMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        logger = logging.getLogger(__name__)
         # Skip for non-authenticated users
         if not request.user.is_authenticated:
             return self.get_response(request)
-        
+
         # Skip for superusers (they have full access)
         if request.user.is_superuser:
             return self.get_response(request)
-        
+
         path = request.path_info
+        # Allow certain account endpoints for all authenticated users (logout, business login)
+        # This prevents the middleware from blocking access to logout and business login pages.
+        if path.startswith('/accounts/logout') or path.startswith('/accounts/email-login') or path.startswith('/accounts/business-register'):
+            logger.debug(f"UserTypeAccessMiddleware: allowing access to auth endpoint: {path} for user={getattr(request.user, 'username', None)} type={getattr(request.user, 'user_type', None)}")
+            return self.get_response(request)
+
         user_type = getattr(request.user, 'user_type', 'customer')
         
         # Define URL patterns and their allowed user types
@@ -59,20 +67,25 @@ class UserTypeAccessMiddleware:
                 if user_type not in rule_data['allowed_users']:
                     # Special handling for admin paths
                     if rule_name == 'admin':
+                        logger.info(f"UserTypeAccessMiddleware: redirecting user={getattr(request.user,'username',None)} path={path} -> core:home")
                         return redirect('core:home')
                     
                     # Special handling for store paths
                     elif rule_name == 'store':
                         if user_type == 'customer':
+                            logger.info(f"UserTypeAccessMiddleware: redirecting customer user={getattr(request.user,'username',None)} path={path} -> core:home")
                             return redirect('core:home')
                         else:
+                            logger.info(f"UserTypeAccessMiddleware: redirecting non-customer user={getattr(request.user,'username',None)} path={path} -> accounts:email_login")
                             return redirect('accounts:email_login')
                     
                     # Special handling for delivery paths  
                     elif rule_name == 'delivery':
                         if user_type == 'customer':
+                            logger.info(f"UserTypeAccessMiddleware: redirecting customer user={getattr(request.user,'username',None)} path={path} -> core:home")
                             return redirect('core:home')
                         else:
+                            logger.info(f"UserTypeAccessMiddleware: redirecting non-customer user={getattr(request.user,'username',None)} path={path} -> accounts:email_login")
                             return redirect('accounts:email_login')
                     
                     # For customer paths, redirect non-customers appropriately

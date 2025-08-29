@@ -279,29 +279,36 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Sales Chart
-const ctx = document.getElementById('salesChart').getContext('2d');
-const salesChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: {{ sales_chart_labels|safe }},
-        datasets: [{
-            label: 'Sales (₹)',
-            data: {{ sales_chart_data|safe }},
-            borderColor: 'var(--primary-green)',
-            backgroundColor: 'var(--light-green)',
-            tension: 0.4,
-            fill: true
-        }]
-    },
-    options: {
-        responsive: true,
-        scales: {
-            y: {
-                beginAtZero: true
+const salesCanvas = document.getElementById('salesChart');
+if (salesCanvas) {
+    const ctx = salesCanvas.getContext('2d');
+    // Use safe JSON strings to avoid breaking static JS parsers
+    const salesLabels = JSON.parse('{{ sales_chart_labels|escapejs }}');
+    const salesData = JSON.parse('{{ sales_chart_data|escapejs }}');
+
+    const salesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: salesLabels,
+            datasets: [{
+                label: 'Sales (₹)',
+                data: salesData,
+                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--primary-green') || '#4caf50',
+                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--light-green') || 'rgba(76,175,80,0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
             }
         }
-    }
-});
+    });
+}
 
 function addProduct() {
     const modal = new bootstrap.Modal(document.getElementById('addProductModal'));
@@ -321,29 +328,35 @@ function viewReports() {
 }
 
 // Handle add product form submission
-document.getElementById('addProductForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    
-    fetch(`/stores/{{ store.id }}/add-product/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide();
-            setTimeout(() => location.reload(), 1000);
-        } else {
-        }
-    })
-    .catch(error => {
+const addProductForm = document.getElementById('addProductForm');
+if (addProductForm) {
+    addProductForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+
+        const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        const csrfToken = csrfEl ? csrfEl.value : null;
+
+        fetch(`/stores/{{ store.id }}/add-product/`, {
+            method: 'POST',
+            headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const modalEl = document.getElementById('addProductModal');
+                if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+            }
+        })
+        .catch(error => {
+            console.error('Add product error:', error);
+        });
     });
-});
+}
 </script>
 
 {% endblock %}

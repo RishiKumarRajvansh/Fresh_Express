@@ -145,25 +145,27 @@ function updateStatus(orderId, status) {
     }
 }
 
-function
+function showToast(type, message = '') {
+    const toast = document.createElement('div');
     toast.className = `toast show position-fixed top-0 end-0 m-3`;
     toast.style.zIndex = '9999';
-    
+
+    const headerBg = type === 'success' ? 'bg-success' : type === 'warning' ? 'bg-warning' : 'bg-danger';
+
     toast.innerHTML = `
-        <div class="toast-header bg-${type === 'success' ? 'success' : 'danger'} text-white">
-            <strong class="me-auto">${type === 'success' ? 'Success' : 'Error'}</strong>
-            <button type="button" class="btn-close btn-close-white" onclick="this.parentElement.parentElement.remove()"></button>
+        <div class="toast-header ${headerBg} text-white">
+            <strong class="me-auto">${type === 'success' ? 'Success' : type === 'warning' ? 'Notice' : 'Error'}</strong>
+            <button type="button" class="btn-close btn-close-white" onclick="this.closest('.toast').remove()"></button>
         </div>
         <div class="toast-body">${message}</div>
     `;
-    
+
     document.body.appendChild(toast);
-    
+
     setTimeout(() => {
-        if (toast.parentNode) {
-            toast.remove();
-        }
+        if (toast.parentNode) toast.remove();
     }, 3000);
+}
 
 
 // Add CSRF token

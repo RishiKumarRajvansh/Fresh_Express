@@ -7,10 +7,11 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib import messages
+import logging
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.template.loader import render_to_string
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -496,16 +497,39 @@ class LogoutView(View):
         return self.perform_logout(request)
     
     def perform_logout(self, request):
+        logger = logging.getLogger(__name__)
         user_type = getattr(request.user, 'user_type', 'customer') if request.user.is_authenticated else 'customer'
+        username = getattr(request.user, 'username', None) if request.user.is_authenticated else None
+        # Log the logout request and session state for debugging
+        session_key_before = request.session.session_key
+        logger.info(f"Logout requested by user={username} type={user_type} method={request.method} session_key_before={session_key_before} cookies={request.COOKIES.keys()}")
+
+        # Perform logout (this should clear the session)
         logout(request)
-        
+
+        # After logout, log session key and whether session data remains
+        session_key_after = getattr(request.session, 'session_key', None)
+        try:
+            session_items_after = dict(request.session.items())
+        except Exception:
+            session_items_after = None
+        logger.info(f"Logout completed for user={username} session_key_after={session_key_after} session_items_after_keys={list(session_items_after.keys()) if session_items_after is not None else None}")
+
+        # Provide a success message so clients see confirmation
+        try:
+            messages.success(request, 'You have been logged out successfully.')
+        except Exception:
+            logger.exception('Failed to add logout success message')
+
         # Redirect based on user type
         if user_type in ['admin']:
             return redirect('/admin/login/')
         elif user_type in ['store_owner', 'store_staff']:
-            return redirect('accounts:email_login') 
+            # Redirect store users to the business email login with type=store
+            return redirect(f"{reverse('accounts:email_login')}?type=store")
         elif user_type == 'delivery_agent':
-            return redirect('accounts:email_login')
+            # Redirect delivery agents to the business email login with type=delivery
+            return redirect(f"{reverse('accounts:email_login')}?type=delivery")
         else:  # customer
             return redirect('core:home')
     

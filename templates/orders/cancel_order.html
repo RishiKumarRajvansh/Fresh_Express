@@ -33,7 +33,7 @@
                     {% elif order.status == 'cancelled' %}
                     <!-- Already Cancelled -->
 
-                    {% elif order.status in 'preparing,packed,out_for_delivery' %}
+                    {% elif order.status == 'preparing' or order.status == 'packed' or order.status == 'out_for_delivery' %}
                     <!-- Cannot Cancel - Being Processed -->
                     
                     <div class="d-grid gap-2">
@@ -93,7 +93,7 @@
                             <a href="{% url 'orders:order_list' %}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-2"></i>Keep Order
                             </a>
-                            <button type="button" class="btn btn-danger" onclick="confirmCancellation()">
+                            <button type="button" class="btn btn-danger" onclick="confirmCancellation(event)">
                                 <i class="fas fa-times me-2"></i>Cancel Order
                             </button>
                         </div>
@@ -107,47 +107,51 @@
 
 <script>
 // Show/hide other reason text area
-document.getElementById('reason').addEventListener('change', function() {
-    const otherReasonDiv = document.getElementById('otherReasonDiv');
-    if (this.value === 'other') {
-        otherReasonDiv.style.display = 'block';
-        document.getElementById('other_reason').required = true;
-    } else {
-        otherReasonDiv.style.display = 'none';
-        document.getElementById('other_reason').required = false;
-    }
-});
-
-// Confirm cancellation
-function confirmCancellation() {
-    const form = document.getElementById('cancelOrderForm');
-    const reason = document.getElementById('reason').value;
-    
-    if (!reason) {
-        return;
-    }
-    
-    if (reason === 'other' && !document.getElementById('other_reason').value.trim()) {
-        return;
-    }
-    
-    const confirmMsg = 'Are you sure you want to cancel this order? This action cannot be undone.';
-    
-    if (confirm(confirmMsg)) {
-        // Add loading state
-        const submitBtn = event.target;
-        const originalText = submitBtn.innerHTML;
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cancelling...';
-        
-        // Submit form
-        form.submit();
-    }
+const reasonEl = document.getElementById('reason');
+if (reasonEl) {
+    reasonEl.addEventListener('change', function() {
+        const otherReasonDiv = document.getElementById('otherReasonDiv');
+        const otherReasonInput = document.getElementById('other_reason');
+        if (this.value === 'other') {
+            if (otherReasonDiv) otherReasonDiv.style.display = 'block';
+            if (otherReasonInput) otherReasonInput.required = true;
+        } else {
+            if (otherReasonDiv) otherReasonDiv.style.display = 'none';
+            if (otherReasonInput) otherReasonInput.required = false;
+        }
+    });
 }
 
-// Success message if cancelled
-{% if request.GET.cancelled %}
+// Confirm cancellation
+function confirmCancellation(e) {
+    const form = document.getElementById('cancelOrderForm');
+    const reasonInput = document.getElementById('reason');
+    const otherReasonInput = document.getElementById('other_reason');
+    if (!form || !reasonInput) return;
+
+    const reason = reasonInput.value;
+    if (!reason) return;
+    if (reason === 'other' && (!otherReasonInput || !otherReasonInput.value.trim())) return;
+
+    const confirmMsg = 'Are you sure you want to cancel this order? This action cannot be undone.';
+    if (!confirm(confirmMsg)) return;
+
+    // Add loading state
+    const submitBtn = e && e.currentTarget ? e.currentTarget : null;
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Cancelling...';
+    }
+
+    // Submit form
+    form.submit();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('cancelled')) return;
+
     const toast = document.createElement('div');
     toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed';
     toast.style.cssText = 'top: 20px; right: 20px; z-index: 1000;';
@@ -161,14 +165,9 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     `;
     document.body.appendChild(toast);
-    
     const bsToast = new bootstrap.Toast(toast);
     bsToast.show();
-    
-    toast.addEventListener('hidden.bs.toast', () => {
-        toast.remove();
-    });
+    toast.addEventListener('hidden.bs.toast', () => toast.remove());
 });
-{% endif %}
 </script>
 {% endblock %}

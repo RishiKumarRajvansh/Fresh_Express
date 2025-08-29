@@ -26,7 +26,7 @@
             </a>
             
             <!-- ZIP Code Display: visible to anonymous users and customers only (hide for store owners/staff and delivery agents) -->
-            {% if not user.is_authenticated or not is_store_owner and user.user_type != 'store_staff' and not is_delivery_agent %}
+            {% if not user.is_authenticated or is_customer %}
                 {% if selected_zip_code %}
                 <div class="d-flex align-items-center me-3">
                     <i class="fas fa-map-marker-alt text-muted me-1"></i>
@@ -167,12 +167,18 @@
                             
                             <li><hr class="dropdown-divider"></li>
                             <li>
-                                <form method="post" action="{% url 'accounts:logout' %}" style="margin: 0;">
+                                {% comment %} Robust logout form: mark with data-logout and a data-redirect attribute so client JS can POST and redirect reliably {% endcomment %}
+                                <form method="post" action="{% url 'accounts:logout' %}" style="margin: 0;" data-logout="true"
+                                    data-redirect="{% if user.user_type == 'delivery_agent' %}{% url 'accounts:email_login' %}?type=delivery{% elif user.user_type == 'store_owner' or user.user_type == 'store_staff' %}{% url 'accounts:email_login' %}?type=store{% else %}{% url 'core:home' %}{% endif %}">
                                     {% csrf_token %}
                                     <button type="submit" class="dropdown-item text-danger" style="border: none; background: none; width: 100%; text-align: left;">
                                         <i class="fas fa-sign-out-alt me-2"></i>Logout
                                     </button>
                                 </form>
+                                {# Fallback GET link in case JS or form submission is blocked #}
+                                <a href="{% url 'accounts:logout' %}" class="dropdown-item text-danger" id="logout-get-fallback">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout (link)
+                                </a>
                             </li>
                         </ul>
                     </li>
@@ -246,6 +252,55 @@
     <!-- Custom JS -->
     <script src="{% load static %}{% static 'js/main.js' %}"></script>
     
+    <script>
+    // Robust logout handler: intercept forms with data-logout and POST via fetch with CSRF header
+    (function(){
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+            const logoutForms = document.querySelectorAll('form[data-logout]');
+            logoutForms.forEach(form => {
+                const handler = function(e){
+                    e.preventDefault();
+                    const url = form.getAttribute('action') || window.location.href;
+                    const redirect = form.getAttribute('data-redirect') || '/';
+                    const csrftoken = getCookie('csrftoken');
+
+                    fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'same-origin'
+                    }).then(resp => {
+                        // On any response, redirect to the intended page to avoid stuck UI
+                        window.location.href = redirect;
+                    }).catch(err => {
+                        console.error('Logout fetch failed', err);
+                        // show GET fallback link (in case form submission is blocked)
+                        const fallback = document.getElementById('logout-get-fallback');
+                        if (fallback) {
+                            fallback.classList.remove('d-none');
+                            fallback.click();
+                            return;
+                        }
+                        // fallback to native form submit
+                        form.removeEventListener('submit', handler);
+                        form.submit();
+                    });
+                };
+
+                form.addEventListener('submit', handler);
+            });
+        });
+    })();
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>
