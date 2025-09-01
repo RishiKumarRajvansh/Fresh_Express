@@ -208,6 +208,35 @@
         margin: 0;
     }
 
+    .offer-code {
+        margin-top: 10px;
+        padding: 8px 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .code-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+
+    .code-value {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .code-value:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.05);
+    }
+
     /* Featured Products */
     .modern-featured {
         padding: 30px 0;
@@ -536,11 +565,25 @@
         </div>
     </div>
 
-    <!-- Offers Banner -->
+    <!-- Dynamic Promotional Banners -->
+    {% for banner in home_top_banners %}
+    <div class="modern-offers-banner" style="background-color: {{ banner.background_color }}; color: {{ banner.text_color }};">
+        <h4>{{ banner.title }}</h4>
+        <p>{{ banner.description }}</p>
+        {% if banner.offer_code %}
+        <div class="offer-code">
+            <span class="code-label">Code:</span>
+            <span class="code-value" onclick="copyToClipboard('{{ banner.offer_code }}')">{{ banner.offer_code }}</span>
+        </div>
+        {% endif %}
+    </div>
+    {% empty %}
+    <!-- Fallback static banner if no dynamic banners -->
     <div class="modern-offers-banner">
         <h4>🔥 Fresh Arrival Special</h4>
         <p>Get 20% OFF on first order above ₹500 • Use code: FRESH20</p>
     </div>
+    {% endfor %}
 </div>
 
 <!-- Featured Products -->
@@ -999,6 +1042,43 @@ function notifyWhenAvailable(productId) {
     })
     .catch(error => {
         console.error('Notify error:', error);
+    });
+}
+
+// Copy to clipboard function for coupon codes
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(function() {
+        // Show success message
+        const toast = document.createElement('div');
+        toast.innerText = `Coupon code "${text}" copied!`;
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #27ae60;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            document.body.removeChild(toast);
+        }, 3000);
+    }).catch(function() {
+        // Fallback for older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        // Show success message
+        alert(`Coupon code "${text}" copied!`);
     });
 }
 

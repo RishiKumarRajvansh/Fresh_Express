@@ -75,6 +75,27 @@
                 <i class="fas fa-drumstick-bite me-2"></i>Fresh Express
             </a>
             
+            <!-- Mobile Top Icons (Wishlist, Cart for customers) - Only visible on mobile -->
+            {% if user.is_authenticated and is_customer %}
+            <div class="d-flex align-items-center mobile-top-icons d-lg-none">
+                <!-- Wishlist -->
+                <a class="nav-link position-relative me-3" href="{% url 'accounts:wishlist' %}">
+                    <i class="fas fa-heart fa-lg text-white"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle cart-badge">
+                        <span id="mobile-top-wishlist-count">{{ total_wishlist_items|default:0 }}</span>
+                    </span>
+                </a>
+                
+                <!-- Cart -->
+                <a class="nav-link position-relative me-2" href="{% url 'orders:cart' %}">
+                    <i class="fas fa-shopping-cart fa-lg text-white"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle cart-badge">
+                        <span id="mobile-top-cart-count">{{ total_cart_items|default:0 }}</span>
+                    </span>
+                </a>
+            </div>
+            {% endif %}
+            
             <!-- Location Selector (show for anonymous users and customers only; hide for store/delivery roles) -->
             {% if not user.is_authenticated or is_customer %}
                 {% if zip_area %}
@@ -275,9 +296,9 @@
                                         <i class="fas fa-sign-out-alt me-2"></i>Logout
                                     </button>
                                 </form>
-                                {# Fallback GET link in case JS or form submission is blocked #}
-                                <a href="{% url 'accounts:logout' %}" class="dropdown-item text-danger" id="logout-get-fallback-mobile">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Logout (link)
+                                {# Fallback GET link in case JS or form submission is blocked - hidden by default #}
+                                <a href="{% url 'accounts:logout' %}" class="dropdown-item text-danger d-none" id="logout-get-fallback-mobile">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout (fallback)
                                 </a>
                             </li>
                         </ul>
@@ -303,7 +324,7 @@
     </main>
     
     <!-- Mobile Bottom Navigation -->
-    <nav class="mobile-bottom-nav">
+    <nav class="mobile-bottom-nav d-lg-none">
         <div class="container-fluid">
             <div class="row">
                 {% if user.is_authenticated and user.user_type == 'delivery_agent' %}
@@ -321,10 +342,33 @@
                     </a>
                 </div>
                 <div class="col">
-                    <a href="{% url 'accounts:profile' %}" class="bottom-nav-item">
-                        <i class="fas fa-user"></i>
-                        <span>Profile</span>
-                    </a>
+                    <div class="dropdown dropup" id="mobileProfileDropdownDelivery">
+                        <button class="bottom-nav-item" type="button" aria-expanded="false" id="profileDropdownBtnDelivery">
+                            <i class="fas fa-user"></i>
+                            <span>Profile</span>
+                        </button>
+                        <div class="dropdown-menu profile-dropdown" id="profileDropdownMenuDelivery">
+                            <div class="dropdown-header text-center">
+                                <div class="rounded-circle bg-info text-white mx-auto mb-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-truck"></i>
+                                </div>
+                                <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+                                <small class="text-muted">{{ user.get_user_type_display }}</small>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                                <i class="fas fa-user me-2"></i>My Profile
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <form method="post" action="{% url 'accounts:logout' %}" style="margin: 0;" data-logout="true"
+                                data-redirect="{% url 'accounts:email_login' %}?type=delivery">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger" style="border: none; background: none; width: 100%; text-align: left;">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
                 
                 {% elif user.is_authenticated and user.user_type == 'store_owner' or user.user_type == 'store_staff' %}
@@ -348,10 +392,33 @@
                     </a>
                 </div>
                 <div class="col">
-                    <a href="{% url 'accounts:profile' %}" class="bottom-nav-item">
-                        <i class="fas fa-user"></i>
-                        <span>Profile</span>
-                    </a>
+                    <div class="dropdown dropup" id="mobileProfileDropdownStore">
+                        <button class="bottom-nav-item" type="button" aria-expanded="false" id="profileDropdownBtnStore">
+                            <i class="fas fa-user"></i>
+                            <span>Profile</span>
+                        </button>
+                        <div class="dropdown-menu profile-dropdown" id="profileDropdownMenuStore">
+                            <div class="dropdown-header text-center">
+                                <div class="rounded-circle bg-warning text-white mx-auto mb-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-store"></i>
+                                </div>
+                                <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+                                <small class="text-muted">{{ user.get_user_type_display }}</small>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                                <i class="fas fa-user me-2"></i>My Profile
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <form method="post" action="{% url 'accounts:logout' %}" style="margin: 0;" data-logout="true"
+                                data-redirect="{% url 'accounts:email_login' %}?type=store">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger" style="border: none; background: none; width: 100%; text-align: left;">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
                 
                 {% elif is_customer %}
@@ -370,31 +437,63 @@
                 </div>
                 {% if user.is_authenticated %}
                 <div class="col">
-                    <a href="{% url 'accounts:wishlist' %}" class="bottom-nav-item position-relative">
-                        <i class="fas fa-heart"></i>
-                        <span class=" cart-badge">
-                            <span id="mobile-wishlist-count">{{ total_wishlist_items|default:0 }}</span>
-                        </span>
-                        <span>Wishlist</span>
-                    </a>
-                </div>
-                <div class="col">
-                    <a href="{% url 'orders:cart' %}" class="bottom-nav-item position-relative">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span class=" cart-badge">
-                            <span id="mobile-cart-count">{{ total_cart_items|default:0 }}</span>
-                        </span>
-                        <span>Cart</span>
-                    </a>
-                </div>
-                <div class="col">
                     <a href="{% url 'orders:order_list' %}" class="bottom-nav-item">
                         <i class="fas fa-box"></i>
                         <span>Orders</span>
                     </a>
                 </div>
+                <div class="col">
+                    <div class="dropdown dropup" id="mobileProfileDropdown">
+                        <button class="bottom-nav-item" type="button" aria-expanded="false" id="profileDropdownBtn">
+                            <i class="fas fa-user"></i>
+                            <span>Profile</span>
+                        </button>
+                        <div class="dropdown-menu profile-dropdown" id="profileDropdownMenu">
+                            <div class="dropdown-header text-center">
+                                <div class="rounded-circle bg-success text-white mx-auto mb-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div class="fw-semibold">{{ user.get_full_name|default:user.username }}</div>
+                                <small class="text-muted">{{ user.get_user_type_display }}</small>
+                            </div>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="{% url 'core:customer_dashboard' %}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                            </a>
+                            <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                                <i class="fas fa-user me-2"></i>My Profile
+                            </a>
+                            <a class="dropdown-item" href="{% url 'accounts:address_list' %}">
+                                <i class="fas fa-map-marker-alt me-2"></i>My Addresses
+                            </a>
+                            <a class="dropdown-item" href="{% url 'accounts:loyalty_dashboard' %}">
+                                <i class="fas fa-star me-2"></i>Loyalty & Rewards
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <form method="post" action="{% url 'accounts:logout' %}" style="margin: 0;" data-logout="true"
+                                data-redirect="{% url 'core:home' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="dropdown-item text-danger" style="border: none; background: none; width: 100%; text-align: left;">
+                                    <i class="fas fa-sign-out-alt me-2"></i>Logout
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
                 {% else %}
+                <div class="col">
+                    <a href="{% url 'core:home' %}" class="bottom-nav-item">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                </div>
+                <div class="col">
+                    <a href="{% url 'catalog:product_list' %}" class="bottom-nav-item">
+                        <i class="fas fa-search"></i>
+                        <span>Explore</span>
+                    </a>
+                </div>
                 <div class="col">
                     <a href="{% url 'accounts:customer_login' %}" class="bottom-nav-item">
                         <i class="fas fa-sign-in-alt"></i>
@@ -568,7 +667,7 @@
             
             // Update cart counters
             if (data.cart_count !== undefined) {
-                const cartCountElements = document.querySelectorAll('#cart-count, #mobile-cart-count');
+                const cartCountElements = document.querySelectorAll('#cart-count, #mobile-cart-count, #mobile-top-cart-count');
                 cartCountElements.forEach(element => {
                     if (element) {
                         element.textContent = data.cart_count;
@@ -579,7 +678,7 @@
             
             // Update wishlist counters  
             if (data.wishlist_count !== undefined) {
-                const wishlistCountElements = document.querySelectorAll('#wishlist-count, #mobile-wishlist-count');
+                const wishlistCountElements = document.querySelectorAll('#wishlist-count, #mobile-wishlist-count, #mobile-top-wishlist-count');
                 wishlistCountElements.forEach(element => {
                     if (element) {
                         element.textContent = data.wishlist_count;
@@ -588,6 +687,76 @@
                 });
             }
         };
+
+        // Handle mobile profile dropdown positioning
+        document.addEventListener('DOMContentLoaded', function() {
+            // Simple function to toggle dropdown visibility
+            function toggleDropdown(btnId, menuId) {
+                const profileBtn = document.getElementById(btnId);
+                const profileMenu = document.getElementById(menuId);
+                
+                if (profileBtn && profileMenu) {
+                    profileBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        // Close all other dropdowns first
+                        document.querySelectorAll('.profile-dropdown').forEach(menu => {
+                            if (menu !== profileMenu) {
+                                menu.style.display = 'none';
+                                menu.classList.remove('show');
+                            }
+                        });
+                        
+                        // Toggle current dropdown
+                        const isVisible = profileMenu.style.display === 'block';
+                        
+                        if (isVisible) {
+                            // Hide dropdown
+                            profileMenu.style.display = 'none';
+                            profileMenu.classList.remove('show');
+                            document.body.style.overflow = '';
+                        } else {
+                            // Show dropdown
+                            profileMenu.style.cssText = `
+                                display: block !important;
+                                position: fixed !important;
+                                bottom: 80px !important;
+                                left: 50% !important;
+                                transform: translateX(-50%) !important;
+                                z-index: 10000 !important;
+                                max-width: 320px !important;
+                                width: calc(100vw - 40px) !important;
+                                background-color: white !important;
+                                border: 1px solid #e0e0e0 !important;
+                                border-radius: 12px !important;
+                                box-shadow: 0 4px 20px rgba(0,0,0,0.15) !important;
+                                padding: 1rem 0 !important;
+                                opacity: 1 !important;
+                                visibility: visible !important;
+                            `;
+                            
+                            profileMenu.classList.add('show');
+                            document.body.style.overflow = 'hidden';
+                        }
+                    });
+                    
+                    // Close when clicking outside
+                    document.addEventListener('click', function(e) {
+                        if (!profileBtn.contains(e.target) && !profileMenu.contains(e.target)) {
+                            profileMenu.style.display = 'none';
+                            profileMenu.classList.remove('show');
+                            document.body.style.overflow = '';
+                        }
+                    });
+                }
+            }
+            
+            // Setup all dropdowns
+            toggleDropdown('profileDropdownBtnDelivery', 'profileDropdownMenuDelivery');
+            toggleDropdown('profileDropdownBtnStore', 'profileDropdownMenuStore');
+            toggleDropdown('profileDropdownBtn', 'profileDropdownMenu');
+        });
     </script>
     
     <!-- CSRF Token -->

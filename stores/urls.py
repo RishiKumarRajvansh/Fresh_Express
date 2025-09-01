@@ -3,6 +3,10 @@ from django.shortcuts import redirect
 from . import views
 from . import views_bulk_import
 from . import views_additional
+from .order_management_views import (
+    StoreOrderDashboardView, StoreOrderListView, StoreOrderDetailView,
+    StoreOrderStatusUpdateView, StoreBulkOrderActionsView, store_order_analytics_api
+)
 
 app_name = 'stores'
 
@@ -12,8 +16,19 @@ urlpatterns = [
     
     # Store management for store owners - Updated URL names to match dashboard templates
     path('dashboard/', views.StoreDashboardView.as_view(), name='dashboard'),
-    path('orders/', views.store_orders, name='orders_management'),
-    path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
+    
+    # Enhanced Order Management System - Primary Routes
+    path('orders/', StoreOrderListView.as_view(), name='orders'),
+    path('orders/dashboard/', StoreOrderDashboardView.as_view(), name='orders_dashboard'),
+    path('orders/list/', StoreOrderListView.as_view(), name='orders_list'),
+    path('orders/<str:order_number>/', StoreOrderDetailView.as_view(), name='order_detail'),
+    path('api/orders/update-status/<str:order_number>/', StoreOrderStatusUpdateView.as_view(), name='update_order_status'),
+    path('api/orders/bulk-actions/', StoreBulkOrderActionsView.as_view(), name='bulk_order_actions'),
+    path('api/orders/analytics/', store_order_analytics_api, name='order_analytics'),
+    
+    # Legacy order management (kept for backward compatibility)
+    path('orders/legacy/', views.store_orders, name='orders_management'),
+    path('orders/legacy/<int:order_id>/', views.order_detail, name='legacy_order_detail'),
     path('inventory/', views.store_inventory, name='inventory_management'),
     path('inventory/edit/<int:product_id>/', views.edit_store_product, name='edit_product'),
     path('inventory/delete/<int:product_id>/', views.delete_store_product, name='delete_product'),

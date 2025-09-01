@@ -125,11 +125,6 @@ def add_to_cart_view(request):
         }, status=405)
     
     try:
-        # Quick stdout trace to ensure server sees the request in development console
-        try:
-            print('ADD_TO_CART_VIEW_HIT', request.method, request.path, 'CONTENT_TYPE=', request.META.get('CONTENT_TYPE'), 'COOKIES=', list(getattr(request, 'COOKIES', {}).keys()))
-        except Exception:
-            pass
         # Handle both JSON and form data. Accept content types like
         # 'application/json; charset=UTF-8' by checking startswith.
         content_type = (request.content_type or '')
@@ -467,7 +462,12 @@ class CheckoutView(LoginRequiredMixin, TemplateView):
             # Get selected address - check both possible field names
             address_id = request.POST.get('delivery_address_id') or request.POST.get('delivery_address')
             
+            # Get selected payment method
+            payment_method = request.POST.get('payment_method', 'cod')
+            
             if not address_id:
+                from django.contrib import messages
+                messages.error(request, 'Please select a delivery address.')
                 return self.get(request, *args, **kwargs)
             
             # Get user's active carts
@@ -509,7 +509,7 @@ class CheckoutView(LoginRequiredMixin, TemplateView):
                     store=cart.store,
                     delivery_address_id=address_id,
                     status='placed',
-                    payment_method='cod',  # Default to cash on delivery
+                    payment_method=payment_method,  # Use selected payment method
                     subtotal=subtotal,
                     delivery_fee=delivery_fee,
                     tax_amount=tax_amount,
@@ -532,14 +532,90 @@ class CheckoutView(LoginRequiredMixin, TemplateView):
                 
                 orders_created.append(order)
             
-            # Redirect to order confirmation or payment
-            if len(orders_created) == 1:
-                return redirect('orders:order_detail', order_number=orders_created[0].order_number)
+            # Handle payment based on selected method
+            if payment_method in ['upi', 'card']:
+                # For online payments, redirect to payment processing
+                if len(orders_created) == 1:
+                    return redirect('orders:process_payment', order_number=orders_created[0].order_number)
+                else:
+                    # For multiple orders, process the first one (you might want to handle this differently)
+                    return redirect('orders:process_payment', order_number=orders_created[0].order_number)
             else:
-                return redirect('orders:order_list')
+                # For COD, redirect directly to order confirmation
+                if len(orders_created) == 1:
+                    return redirect('orders:order_detail', order_number=orders_created[0].order_number)
+                else:
+                    return redirect('orders:order_list')
                 
         except Exception as e:
+            from django.contrib import messages
+            messages.error(request, 'An error occurred while processing your order. Please try again.')
             return self.get(request, *args, **kwargs)
+
+
+class ProcessPaymentView(LoginRequiredMixin, View):
+    """Handle payment processing for orders"""
+    
+    def get(self, request, order_number):
+        """Initiate payment for the order"""
+        try:
+            # Get the order
+            order = get_object_or_404(Order, order_number=order_number, user=request.user)
+            
+            # Import payment processor
+            from payments.phonepe_processor import PhonePeProcessor
+            from payments.models_advanced import PaymentGateway
+            
+            # Get PhonePe gateway
+            try:
+                phonepe_gateway = PaymentGateway.objects.get(gateway_type='phonepe', is_active=True)
+            except PaymentGateway.DoesNotExist:
+                from django.contrib import messages
+                messages.error(request, 'Payment gateway is currently unavailable. Please try again later.')
+                return redirect('orders:cart')
+            
+            # Initialize PhonePe processor
+            try:
+                processor = PhonePeProcessor()
+            except Exception as proc_error:
+                from django.contrib import messages
+                messages.error(request, 'Payment service initialization failed.')
+                return redirect('orders:cart')
+            
+            # Create payment transaction
+            try:
+                payment_data = processor.create_payment(
+                    amount=float(order.total_amount),
+                    order_id=str(order.order_number),
+                    user_id=str(request.user.id),
+                    redirect_url=request.build_absolute_uri('/orders/cart/'),
+                    callback_url=request.build_absolute_uri('/payments/phonepe/webhook/')
+                )
+                
+                if payment_data['success']:
+                    # Update order status to pending payment
+                    order.status = 'payment_pending'
+                    order.save()
+                    
+                    # Redirect to PhonePe payment page
+                    payment_url = payment_data['payment_url']
+                    return redirect(payment_url)
+                else:
+                    from django.contrib import messages
+                    error_msg = payment_data.get('error', 'Unknown error')
+                    messages.error(request, f'Unable to initiate payment: {error_msg}')
+                    return redirect('orders:cart')
+                    
+            except Exception as payment_error:
+                from django.contrib import messages
+                messages.error(request, 'Payment processing error occurred.')
+                return redirect('orders:cart')
+                
+        except Exception as e:
+            from django.contrib import messages
+            messages.error(request, f'Payment initiation failed: {str(e)}')
+            return redirect('orders:cart')
+
 
 class CheckoutAddressView(LoginRequiredMixin, TemplateView):
     template_name = 'orders/checkout_address.html'

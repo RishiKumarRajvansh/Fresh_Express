@@ -71,8 +71,10 @@ class PhoneRegistrationForm(forms.Form):
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and User.objects.filter(email=email).exists():
-            raise forms.ValidationError('An account with this email already exists.')
+        if email:
+            email = email.lower().strip()  # Convert to lowercase and strip whitespace
+            if User.objects.filter(email=email).exists():
+                raise forms.ValidationError('An account with this email already exists.')
         return email
 
 class EmailLoginForm(forms.Form):
@@ -89,6 +91,12 @@ class EmailLoginForm(forms.Form):
             'placeholder': 'Enter your password'
         })
     )
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email:
+            email = email.lower().strip()  # Convert to lowercase and strip whitespace
+        return email
 
 class CustomPasswordResetForm(PasswordResetForm):
     """Custom password reset form for non-customer users"""
@@ -96,6 +104,7 @@ class CustomPasswordResetForm(PasswordResetForm):
     def clean_email(self):
         email = self.cleaned_data.get('email')
         if email:
+            email = email.lower().strip()  # Convert to lowercase and strip whitespace
             # Only allow password reset for non-customer users
             user = User.objects.filter(email=email).exclude(user_type='customer').first()
             if not user:

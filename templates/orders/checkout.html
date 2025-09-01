@@ -173,31 +173,16 @@
                     </div>
                     <div class="card-body">
                         <div class="payment-methods">
-                            <!-- Cash on Delivery -->
-                            <div class="form-check mb-3 p-3 border rounded">
+                            <!-- UPI Payment - Default and Recommended -->
+                            <div class="form-check mb-3 p-3 border rounded border-primary">
                                 <input class="form-check-input" type="radio" name="payment_method" 
-                                       id="cod" value="cod" checked>
-                                <label class="form-check-label w-100" for="cod">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-money-bill-wave text-success me-3" style="font-size: 1.5rem;"></i>
-                                        <div>
-                                            <strong>Cash on Delivery</strong>
-                                            <br><small class="text-muted">Pay when your order arrives</small>
-                                        </div>
-                                    </div>
-                                </label>
-                            </div>
-                            
-                            <!-- UPI Payment -->
-                            <div class="form-check mb-3 p-3 border rounded">
-                                <input class="form-check-input" type="radio" name="payment_method" 
-                                       id="upi" value="upi">
+                                       id="upi" value="upi" checked>
                                 <label class="form-check-label w-100" for="upi">
                                     <div class="d-flex align-items-center">
                                         <i class="fas fa-mobile-alt text-primary me-3" style="font-size: 1.5rem;"></i>
                                         <div>
-                                            <strong>UPI Payment</strong>
-                                            <br><small class="text-muted">Pay using Google Pay, PhonePe, Paytm & more</small>
+                                            <strong>UPI Payment <span class="badge bg-primary ms-2">Recommended</span></strong>
+                                            <br><small class="text-muted">Fast & Secure - Pay using PhonePe, Google Pay, Paytm & more</small>
                                         </div>
                                     </div>
                                 </label>
@@ -213,6 +198,21 @@
                                         <div>
                                             <strong>Credit/Debit Card</strong>
                                             <br><small class="text-muted">Visa, Mastercard, Rupay accepted</small>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                            
+                            <!-- Cash on Delivery -->
+                            <div class="form-check mb-3 p-3 border rounded">
+                                <input class="form-check-input" type="radio" name="payment_method" 
+                                       id="cod" value="cod">
+                                <label class="form-check-label w-100" for="cod">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-money-bill-wave text-success me-3" style="font-size: 1.5rem;"></i>
+                                        <div>
+                                            <strong>Cash on Delivery</strong>
+                                            <br><small class="text-muted">Pay when your order arrives</small>
                                         </div>
                                     </div>
                                 </label>

@@ -23,6 +23,7 @@ class ZipCodeMiddleware(MiddlewareMixin):
             current_path.startswith('/stores/') or   # Store owner dashboards
             current_path.startswith('/delivery/') or # Delivery agent dashboards
             current_path.startswith('/dashboard/') or # Core dashboard system
+            current_path.startswith('/payments/') or  # Payment callbacks and webhooks
             current_path.startswith('/debug/') or    # Debug pages
             current_path.startswith('/manual-test/') or  # Test pages
             current_path.startswith('/simple-cart-test/') or  # Simple cart test

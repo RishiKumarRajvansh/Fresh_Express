@@ -11,7 +11,8 @@ import string
 import random
 from .models import (
     UserLoyaltyAccount, LoyaltyReward, 
-    LoyaltyProgram, UserRewardRedemption, ReferralProgram
+    LoyaltyProgram, UserRewardRedemption, ReferralProgram,
+    LoyaltyConfiguration
 )
 
 @login_required
@@ -21,14 +22,13 @@ def loyalty_dashboard(request):
         loyalty_account = UserLoyaltyAccount.objects.get(user=request.user)
     except UserLoyaltyAccount.DoesNotExist:
         # Create account if doesn't exist
-        loyalty_program = LoyaltyProgram.objects.filter(is_active=True).first()
-        if loyalty_program:
-            loyalty_account = UserLoyaltyAccount.objects.create(
-                user=request.user,
-                loyalty_program=loyalty_program
-            )
-        else:
-            return redirect('core:home')
+        loyalty_account = UserLoyaltyAccount.objects.create(user=request.user)
+    
+    # Get loyalty configuration
+    config = LoyaltyConfiguration.get_active_config()
+    
+    # Get tier progression information
+    next_tier, next_tier_points, progress_percent = loyalty_account.get_next_tier_info()
     
     # Get recent transactions
     recent_transactions = loyalty_account.transactions.all()[:10]
@@ -44,30 +44,24 @@ def loyalty_dashboard(request):
     # Get user's redeemed rewards
     redeemed_rewards = UserRewardRedemption.objects.filter(user=request.user)[:5]
     
-    # Calculate points needed for next tier
+    # Calculate tier thresholds for progress display
     tier_thresholds = {
-        'Silver': 1000,
-        'Gold': 5000,
-        'Platinum': 10000
+        'Bronze': config.bronze_threshold if config else 0,
+        'Silver': config.silver_threshold if config else 1000,
+        'Gold': config.gold_threshold if config else 2000,
+        'Platinum': config.platinum_threshold if config else 3000,
     }
-    
-    next_tier_points = 0
-    current_tier = loyalty_account.current_tier
-    
-    if current_tier == 'Bronze':
-        next_tier_points = tier_thresholds['Silver'] - loyalty_account.lifetime_earned
-    elif current_tier == 'Silver':
-        next_tier_points = tier_thresholds['Gold'] - loyalty_account.lifetime_earned
-    elif current_tier == 'Gold':
-        next_tier_points = tier_thresholds['Platinum'] - loyalty_account.lifetime_earned
-    
+
     context = {
         'loyalty_account': loyalty_account,
         'recent_transactions': recent_transactions,
         'available_rewards': available_rewards,
         'redeemed_rewards': redeemed_rewards,
+        'next_tier': next_tier,
         'next_tier_points': max(0, next_tier_points),
-        'tier_thresholds': tier_thresholds
+        'tier_thresholds': tier_thresholds,
+        'progress_percent': round(progress_percent, 1),
+        'config': config,
     }
     
     return render(request, 'accounts/loyalty_dashboard.html', context)

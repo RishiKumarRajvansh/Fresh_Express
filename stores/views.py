@@ -262,6 +262,7 @@ class UpdateInventoryView(TemplateView):
 # ================ NEW STORE DASHBOARD VIEWS ================
 
 @store_required
+@store_required
 def store_orders(request):
     """View for managing store orders - Only accessible by store owners and staff"""
     # Get the store owned by current user
@@ -272,9 +273,9 @@ def store_orders(request):
             # Store staff should have access to their assigned store
             store = Store.objects.get(staff=request.user)
         else:
-            raise Store.DoesNotExist
+            return render(request, 'stores/access_denied.html')
     except Store.DoesNotExist:
-        return redirect('core:home')
+        return render(request, 'stores/access_denied.html')
     
     # Get orders for this store
     status_filter = request.GET.get('status', '')
@@ -301,11 +302,14 @@ def order_detail(request, order_id):
     try:
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
-        else:
+        elif request.user.user_type == 'store_staff':
             store = Store.objects.get(staff=request.user)
+        else:
+            return render(request, 'stores/access_denied.html')
+        
         order = get_object_or_404(Order, id=order_id, store=store)
     except Store.DoesNotExist:
-        return redirect('core:home')
+        return render(request, 'stores/access_denied.html')
     
     context = {
         'store': store,

@@ -1,5 +1,9 @@
 from django.urls import path
 from . import views
+from .management_views import (
+    OrderManagementView, OrderDetailManagementView, OrderStatusUpdateView,
+    BulkOrderActionsView, order_analytics_api, OrderDashboardView
+)
 
 app_name = 'orders'
 
@@ -19,7 +23,18 @@ urlpatterns = [
     path('checkout/payment/', views.CheckoutPaymentView.as_view(), name='checkout_payment'),
     path('checkout/confirmation/', views.CheckoutConfirmationView.as_view(), name='checkout_confirmation'),
     
-    # Order management
+    # Payment processing
+    path('process-payment/<str:order_number>/', views.ProcessPaymentView.as_view(), name='process_payment'),
+    
+    # Order Management (Enhanced)
+    path('dashboard/', OrderDashboardView.as_view(), name='order_dashboard'),
+    path('manage/', OrderManagementView.as_view(), name='order_management'),
+    path('manage/<str:order_number>/', OrderDetailManagementView.as_view(), name='order_detail_management'),
+    path('api/update-status/<str:order_number>/', OrderStatusUpdateView.as_view(), name='update_order_status'),
+    path('api/bulk-actions/', BulkOrderActionsView.as_view(), name='bulk_order_actions'),
+    path('api/analytics/', order_analytics_api, name='order_analytics_api'),
+    
+    # Order management (Original)
     path('', views.OrderListView.as_view(), name='order_list'),
     path('<str:order_number>/', views.OrderDetailView.as_view(), name='order_detail'),
     path('<str:order_number>/track/', views.OrderTrackingView.as_view(), name='order_tracking'),

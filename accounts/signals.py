@@ -4,8 +4,9 @@ Signals for automatic loyalty points processing
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from orders.models import Order
-from .models_loyalty import UserLoyaltyAccount, LoyaltyProgram, ReferralProgram
+from .models import UserLoyaltyAccount, LoyaltyProgram, ReferralProgram, LoyaltyConfiguration
 
 User = get_user_model()
 
@@ -13,25 +14,20 @@ User = get_user_model()
 def award_loyalty_points(sender, instance, created, **kwargs):
     """Award loyalty points when order is delivered"""
     if instance.status == 'delivered' and not hasattr(instance, '_loyalty_points_awarded'):
-        # Get active loyalty program
-        loyalty_program = LoyaltyProgram.objects.filter(is_active=True).first()
-        if not loyalty_program:
-            return
-        
         # Get or create user loyalty account
         loyalty_account, created = UserLoyaltyAccount.objects.get_or_create(
-            user=instance.user,
-            defaults={'loyalty_program': loyalty_program}
+            user=instance.user
         )
         
-        # Calculate points (points_per_rupee * order total)
-        points_to_award = int(float(instance.total_amount) * float(loyalty_program.points_per_rupee))
+        # Calculate points based on dynamic configuration
+        points_to_award = loyalty_account.calculate_points_for_order(instance.total_amount)
         
-        # Award points
-        loyalty_account.add_points(
-            points_to_award,
-            f"Order #{instance.order_number} - ₹{instance.total_amount}"
-        )
+        if points_to_award > 0:
+            # Award points
+            loyalty_account.add_points(
+                points_to_award,
+                f"Order #{instance.order_number} - ₹{instance.total_amount}"
+            )
         
         # Mark as processed to avoid duplicate awards
         instance._loyalty_points_awarded = True
@@ -53,17 +49,54 @@ def process_referral_bonus(sender, instance, created, **kwargs):
                 if not referral.referred_first_order:
                     referral.referred_first_order = instance
                     referral.save()
-                    referral.process_referral_bonus()
+                    
+                    # Process referral bonus for both users
+                    if not referral.referrer_bonus_given:
+                        try:
+                            # Award bonus to referrer
+                            referrer_loyalty = UserLoyaltyAccount.objects.get(user=referral.referrer)
+                            referrer_loyalty.add_points(
+                                points=100,
+                                transaction_type='referral_bonus',
+                                reason=f'Referral bonus for inviting {instance.user.get_full_name() or instance.user.username}'
+                            )
+                            referral.referrer_bonus_given = True
+                        except UserLoyaltyAccount.DoesNotExist:
+                            pass
+                    
+                    if not referral.referred_bonus_given:
+                        try:
+                            # Award bonus to referred user
+                            referred_loyalty = UserLoyaltyAccount.objects.get(user=instance.user)
+                            referred_loyalty.add_points(
+                                points=100,
+                                transaction_type='referral_order_bonus',
+                                reason='Bonus for completing first order through referral'
+                            )
+                            referral.referred_bonus_given = True
+                        except UserLoyaltyAccount.DoesNotExist:
+                            pass
+                    
+                    referral.bonus_awarded_at = timezone.now()
+                    referral.save()
+                    
             except ReferralProgram.DoesNotExist:
                 pass  # User wasn't referred
 
 @receiver(post_save, sender=User)
 def create_loyalty_account(sender, instance, created, **kwargs):
-    """Create loyalty account for new users"""
-    if created:
-        loyalty_program = LoyaltyProgram.objects.filter(is_active=True).first()
-        if loyalty_program:
-            UserLoyaltyAccount.objects.get_or_create(
-                user=instance,
-                defaults={'loyalty_program': loyalty_program}
-            )
+    """Create loyalty account for new customer users"""
+    if created and instance.user_type == 'customer':
+        UserLoyaltyAccount.objects.get_or_create(user=instance)
+        
+        # Give signup bonus
+        config = LoyaltyConfiguration.get_active_config()
+        if config and config.signup_bonus_points > 0:
+            try:
+                loyalty_account = UserLoyaltyAccount.objects.get(user=instance)
+                loyalty_account.add_points(
+                    config.signup_bonus_points,
+                    'Welcome bonus for joining Fresh Express'
+                )
+            except UserLoyaltyAccount.DoesNotExist:
+                pass

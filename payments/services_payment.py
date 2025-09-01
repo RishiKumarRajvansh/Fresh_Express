@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
+from django.db.models import Count, Sum, Avg, Q
 from django.core.cache import cache
 from payments.models_advanced import (
     PaymentGateway, PaymentMethod, PaymentTransaction, PaymentWebhook
@@ -39,35 +40,45 @@ class PaymentProcessor:
             max_amount__gte=amount
         )
         
-        # Filter by payment type support
-        if payment_type == 'upi':
-            suitable_gateways = suitable_gateways.filter(
-                gateway_type__in=['razorpay', 'paytm', 'phonepe', 'cashfree']
-            )
-        elif payment_type == 'card':
-            suitable_gateways = suitable_gateways.filter(
-                gateway_type__in=['stripe', 'razorpay', 'payu', 'cashfree']
-            )
+        # Priority 1: Always prefer PhonePe if available
+        phonepe_gateway = suitable_gateways.filter(gateway_type='phonepe').first()
+        if phonepe_gateway:
+            return phonepe_gateway
         
-        # Consider location-based preferences
-        if user_location == 'IN':
-            indian_gateways = suitable_gateways.filter(
-                gateway_type__in=['razorpay', 'paytm', 'phonepe', 'payu', 'cashfree']
-            )
-            if indian_gateways.exists():
-                suitable_gateways = indian_gateways
+        # If PhonePe is not available, log warning and return None
+        logger.warning("PhonePe gateway not available. No other gateways are currently active.")
+        return None
         
-        # Calculate cost for each gateway and select cheapest
-        best_gateway = None
-        lowest_fee = float('inf')
-        
-        for gateway in suitable_gateways:
-            fee = gateway.calculate_fee(amount)
-            if fee < lowest_fee:
-                lowest_fee = fee
-                best_gateway = gateway
-        
-        return best_gateway
+        # Legacy code commented out - other gateways disabled
+        # # Filter by payment type support
+        # if payment_type == 'upi':
+        #     suitable_gateways = suitable_gateways.filter(
+        #         gateway_type__in=['phonepe']  # Only PhonePe for UPI
+        #     )
+        # elif payment_type == 'card':
+        #     suitable_gateways = suitable_gateways.filter(
+        #         gateway_type__in=['phonepe']  # Only PhonePe for cards too
+        #     )
+        # 
+        # # Consider location-based preferences
+        # if user_location == 'IN':
+        #     indian_gateways = suitable_gateways.filter(
+        #         gateway_type__in=['phonepe']  # Only PhonePe for India
+        #     )
+        #     if indian_gateways.exists():
+        #         suitable_gateways = indian_gateways
+        # 
+        # # Calculate cost for each gateway and select cheapest
+        # best_gateway = None
+        # lowest_fee = float('inf')
+        # 
+        # for gateway in suitable_gateways:
+        #     fee = gateway.calculate_fee(amount)
+        #     if fee < lowest_fee:
+        #         lowest_fee = fee
+        #         best_gateway = gateway
+        # 
+        # return best_gateway
     
     def initiate_payment(
         self, 
@@ -312,330 +323,572 @@ class BaseGatewayProcessor:
 
 
 class RazorpayProcessor(BaseGatewayProcessor):
-    """Razorpay payment processor"""
+    """Razorpay payment processor - COMMENTED OUT"""
     
     def create_payment(self, transaction: PaymentTransaction) -> Dict:
-        """Create Razorpay payment"""
-        try:
-            import razorpay
-            
-            client = razorpay.Client(
-                auth=(self.config['api_key'], self.config['secret_key'])
-            )
-            
-            order_data = {
-                'amount': int(transaction.amount * 100),  # Amount in paise
-                'currency': transaction.currency,
-                'receipt': str(transaction.transaction_id),
-                'notes': {
-                    'order_id': str(transaction.order.id),
-                    'user_id': str(transaction.user.id)
-                }
-            }
-            
-            razorpay_order = client.order.create(data=order_data)
-            
-            return {
-                'success': True,
-                'transaction_id': razorpay_order['id'],
-                'gateway_data': {
-                    'order_id': razorpay_order['id'],
-                    'key': self.config['api_key'],
-                    'amount': razorpay_order['amount'],
-                    'currency': razorpay_order['currency'],
-                    'name': 'Fresh Meat & Seafood',
-                    'description': f'Order #{transaction.order.id}',
-                    'prefill': {
-                        'name': transaction.user.get_full_name(),
-                        'email': transaction.user.email,
-                        'contact': getattr(transaction.user.profile, 'phone', '') if hasattr(transaction.user, 'profile') else ''
-                    },
-                    'theme': {
-                        'color': '#d32f2f'
-                    }
-                }
-            }
+        """Create Razorpay payment - DISABLED"""
+        return {
+            'success': False,
+            'error': 'Razorpay gateway is currently disabled. Only PhonePe is active.'
+        }
         
-        except Exception as e:
-            logger.error(f"Razorpay order creation failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        # # Razorpay implementation commented out
+        # try:
+        #     import razorpay
+        #     
+        #     client = razorpay.Client(
+        #         auth=(self.config['api_key'], self.config['secret_key'])
+        #     )
+        #     
+        #     order_data = {
+        #         'amount': int(transaction.amount * 100),  # Amount in paise
+        #         'currency': transaction.currency,
+        #         'receipt': str(transaction.transaction_id),
+        #         'notes': {
+        #             'order_id': str(transaction.order.id),
+        #             'user_id': str(transaction.user.id)
+        #         }
+        #     }
+        #     
+        #     razorpay_order = client.order.create(data=order_data)
+        #     
+        #     return {
+        #         'success': True,
+        #         'transaction_id': razorpay_order['id'],
+        #         'gateway_data': {
+        #             'order_id': razorpay_order['id'],
+        #             'key': self.config['api_key'],
+        #             'amount': razorpay_order['amount'],
+        #             'currency': razorpay_order['currency'],
+        #             'name': 'Fresh Meat & Seafood',
+        #             'description': f'Order #{transaction.order.id}',
+        #             'prefill': {
+        #                 'name': transaction.user.get_full_name(),
+        #                 'email': transaction.user.email,
+        #                 'contact': getattr(transaction.user.profile, 'phone', '') if hasattr(transaction.user, 'profile') else ''
+        #             },
+        #             'theme': {
+        #                 'color': '#d32f2f'
+        #             }
+        #         }
+        #     }
+        # 
+        # except Exception as e:
+        #     logger.error(f"Razorpay order creation failed: {str(e)}")
+        #     return {
+        #         'success': False,
+        #         'error': str(e)
+        #     }
     
     def verify_payment(self, transaction: PaymentTransaction, response: Dict) -> Dict:
-        """Verify Razorpay payment"""
-        try:
-            import razorpay
-            
-            client = razorpay.Client(
-                auth=(self.config['api_key'], self.config['secret_key'])
-            )
-            
-            # Verify signature
-            params_dict = {
-                'razorpay_order_id': response.get('razorpay_order_id'),
-                'razorpay_payment_id': response.get('razorpay_payment_id'),
-                'razorpay_signature': response.get('razorpay_signature')
-            }
-            
-            client.utility.verify_payment_signature(params_dict)
-            
-            # Fetch payment details
-            payment_id = response.get('razorpay_payment_id')
-            payment = client.payment.fetch(payment_id)
-            
-            if payment['status'] == 'captured':
-                return {
-                    'success': True,
-                    'gateway_transaction_id': payment_id,
-                    'response': payment
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f"Payment status: {payment['status']}"
-                }
+        """Verify Razorpay payment - DISABLED"""
+        return {
+            'success': False,
+            'error': 'Razorpay gateway is currently disabled. Only PhonePe is active.'
+        }
         
-        except Exception as e:
-            logger.error(f"Razorpay verification failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        # # Razorpay verification commented out
+        # try:
+        #     import razorpay
+        #     
+        #     client = razorpay.Client(
+        #         auth=(self.config['api_key'], self.config['secret_key'])
+        #     )
+        #     
+        #     # Verify signature
+        #     params_dict = {
+        #         'razorpay_order_id': response.get('razorpay_order_id'),
+        #         'razorpay_payment_id': response.get('razorpay_payment_id'),
+        #         'razorpay_signature': response.get('razorpay_signature')
+        #     }
+        #     
+        #     client.utility.verify_payment_signature(params_dict)
+        #     
+        #     # Fetch payment details
+        #     payment_id = response.get('razorpay_payment_id')
+        #     payment = client.payment.fetch(payment_id)
+        #     
+        #     if payment['status'] == 'captured':
+        #         return {
+        #             'success': True,
+        #             'gateway_transaction_id': payment_id,
+        #             'response': payment
+        #         }
+        #     else:
+        #         return {
+        #             'success': False,
+        #             'error': f"Payment status: {payment['status']}"
+        #         }
+        # 
+        # except Exception as e:
+        #     logger.error(f"Razorpay verification failed: {str(e)}")
+        #     return {
+        #         'success': False,
+        #         'error': str(e)
+        #     }
     
     def process_refund(self, original: PaymentTransaction, refund: PaymentTransaction) -> Dict:
-        """Process Razorpay refund"""
-        try:
-            import razorpay
-            
-            client = razorpay.Client(
-                auth=(self.config['api_key'], self.config['secret_key'])
-            )
-            
-            refund_data = {
-                'amount': int(refund.amount * 100),  # Amount in paise
-                'notes': {
-                    'refund_reason': refund.metadata.get('reason', 'Customer refund'),
-                    'original_transaction': str(original.transaction_id)
-                }
-            }
-            
-            razorpay_refund = client.payment.refund(
-                original.gateway_transaction_id, 
-                refund_data
-            )
-            
-            return {
-                'success': True,
-                'refund_id': razorpay_refund['id'],
-                'response': razorpay_refund
-            }
+        """Process Razorpay refund - DISABLED"""
+        return {
+            'success': False,
+            'error': 'Razorpay gateway is currently disabled. Only PhonePe is active.'
+        }
         
-        except Exception as e:
-            logger.error(f"Razorpay refund failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        # # Razorpay refund commented out
+        # try:
+        #     import razorpay
+        #     
+        #     client = razorpay.Client(
+        #         auth=(self.config['api_key'], self.config['secret_key'])
+        #     )
+        #     
+        #     refund_data = {
+        #         'amount': int(refund.amount * 100),  # Amount in paise
+        #         'notes': {
+        #             'refund_reason': refund.metadata.get('reason', 'Customer refund'),
+        #             'original_transaction': str(original.transaction_id)
+        #         }
+        #     }
+        #     
+        #     razorpay_refund = client.payment.refund(
+        #         original.gateway_transaction_id, 
+        #         refund_data
+        #     )
+        #     
+        #     return {
+        #         'success': True,
+        #         'refund_id': razorpay_refund['id'],
+        #         'response': razorpay_refund
+        #     }
+        # 
+        # except Exception as e:
+        #     logger.error(f"Razorpay refund failed: {str(e)}")
+        #     return {
+        #         'success': False,
+        #         'error': str(e)
+        #     }
 
 
 class StripeProcessor(BaseGatewayProcessor):
-    """Stripe payment processor"""
+    """Stripe payment processor - COMMENTED OUT"""
     
     def create_payment(self, transaction: PaymentTransaction) -> Dict:
-        """Create Stripe payment intent"""
-        try:
-            import stripe
-            
-            stripe.api_key = self.config['secret_key']
-            
-            intent = stripe.PaymentIntent.create(
-                amount=int(transaction.amount * 100),  # Amount in cents
-                currency=transaction.currency.lower(),
-                metadata={
-                    'order_id': str(transaction.order.id),
-                    'transaction_id': str(transaction.transaction_id)
-                },
-                automatic_payment_methods={'enabled': True}
-            )
-            
-            return {
-                'success': True,
-                'transaction_id': intent.id,
-                'gateway_data': {
-                    'client_secret': intent.client_secret,
-                    'publishable_key': self.config['api_key']
-                }
-            }
+        """Create Stripe payment - DISABLED"""
+        return {
+            'success': False,
+            'error': 'Stripe gateway is currently disabled. Only PhonePe is active.'
+        }
         
-        except Exception as e:
-            logger.error(f"Stripe payment intent creation failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        # # Stripe implementation commented out
+        # try:
+        #     import stripe
+        #     
+        #     stripe.api_key = self.config['secret_key']
+        #     
+        #     intent = stripe.PaymentIntent.create(
+        #         amount=int(transaction.amount * 100),  # Amount in cents
+        #         currency=transaction.currency.lower(),
+        #         metadata={
+        #             'order_id': str(transaction.order.id),
+        #             'transaction_id': str(transaction.transaction_id)
+        #         },
+        #         automatic_payment_methods={'enabled': True}
+        #     )
+        #     
+        #     return {
+        #         'success': True,
+        #         'transaction_id': intent.id,
+        #         'gateway_data': {
+        #             'client_secret': intent.client_secret,
+        #             'publishable_key': self.config['api_key']
+        #         }
+        #     }
+        # 
+        # except Exception as e:
+        #     logger.error(f"Stripe payment intent creation failed: {str(e)}")
+        #     return {
+        #         'success': False,
+        #         'error': str(e)
+        #     }
     
     def verify_payment(self, transaction: PaymentTransaction, response: Dict) -> Dict:
-        """Verify Stripe payment"""
-        try:
-            import stripe
-            
-            stripe.api_key = self.config['secret_key']
-            
-            payment_intent_id = response.get('payment_intent')
-            intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-            
-            if intent.status == 'succeeded':
-                return {
-                    'success': True,
-                    'gateway_transaction_id': intent.id,
-                    'response': dict(intent)
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f"Payment status: {intent.status}"
-                }
+        """Verify Stripe payment - DISABLED"""
+        return {
+            'success': False,
+            'error': 'Stripe gateway is currently disabled. Only PhonePe is active.'
+        }
         
-        except Exception as e:
-            logger.error(f"Stripe verification failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        # # Stripe verification commented out
+        # try:
+        #     import stripe
+        #     
+        #     stripe.api_key = self.config['secret_key']
+        #     
+        #     payment_intent_id = response.get('payment_intent')
+        #     intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+        #     
+        #     if intent.status == 'succeeded':
+        #         return {
+        #             'success': True,
+        #             'gateway_transaction_id': intent.id,
+        #             'response': dict(intent)
+        #         }
+        #     else:
+        #         return {
+        #             'success': False,
+        #             'error': f"Payment status: {intent.status}"
+        #         }
+        # 
+        # except Exception as e:
+        #     logger.error(f"Stripe verification failed: {str(e)}")
+        #     return {
+        #         'success': False,
+        #         'error': str(e)
+        #     }
     
     def process_refund(self, original: PaymentTransaction, refund: PaymentTransaction) -> Dict:
-        """Process Stripe refund"""
-        try:
-            import stripe
-            
-            stripe.api_key = self.config['secret_key']
-            
-            stripe_refund = stripe.Refund.create(
-                payment_intent=original.gateway_transaction_id,
-                amount=int(refund.amount * 100),
-                metadata={
-                    'reason': refund.metadata.get('reason', 'requested_by_customer'),
-                    'original_transaction': str(original.transaction_id)
-                }
-            )
-            
-            return {
-                'success': True,
-                'refund_id': stripe_refund.id,
-                'response': dict(stripe_refund)
-            }
+        """Process Stripe refund - DISABLED"""
+        return {
+            'success': False,
+            'error': 'Stripe gateway is currently disabled. Only PhonePe is active.'
+        }
         
-        except Exception as e:
-            logger.error(f"Stripe refund failed: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+        # # Stripe refund commented out
+        # try:
+        #     import stripe
+        #     
+        #     stripe.api_key = self.config['secret_key']
+        #     
+        #     stripe_refund = stripe.Refund.create(
+        #         payment_intent=original.gateway_transaction_id,
+        #         amount=int(refund.amount * 100),
+        #         metadata={
+        #             'reason': refund.metadata.get('reason', 'requested_by_customer'),
+        #             'original_transaction': str(original.transaction_id)
+        #         }
+        #     )
+        #     
+        #     return {
+        #         'success': True,
+        #         'refund_id': stripe_refund.id,
+        #         'response': dict(stripe_refund)
+        #     }
+        # 
+        # except Exception as e:
+        #     logger.error(f"Stripe refund failed: {str(e)}")
+        #     return {
+        #         'success': False,
+        #         'error': str(e)
+        #     }
 
 
 class PaytmProcessor(BaseGatewayProcessor):
-    """Paytm payment processor"""
+    """Paytm payment processor - COMMENTED OUT"""
     
     def create_payment(self, transaction: PaymentTransaction) -> Dict:
-        """Create Paytm payment"""
-        # Implement Paytm integration
+        """Create Paytm payment - DISABLED"""
         return {
             'success': False,
-            'error': 'Paytm integration not implemented'
+            'error': 'Paytm gateway is currently disabled. Only PhonePe is active.'
         }
     
     def verify_payment(self, transaction: PaymentTransaction, response: Dict) -> Dict:
-        """Verify Paytm payment"""
+        """Verify Paytm payment - DISABLED"""
         return {
             'success': False,
-            'error': 'Paytm integration not implemented'
+            'error': 'Paytm gateway is currently disabled. Only PhonePe is active.'
         }
     
     def process_refund(self, original: PaymentTransaction, refund: PaymentTransaction) -> Dict:
-        """Process Paytm refund"""
+        """Process Paytm refund - DISABLED"""
         return {
             'success': False,
-            'error': 'Paytm integration not implemented'
+            'error': 'Paytm gateway is currently disabled. Only PhonePe is active.'
         }
 
 
 class PhonePeProcessor(BaseGatewayProcessor):
     """PhonePe payment processor"""
     
+    def __init__(self, gateway: PaymentGateway):
+        super().__init__(gateway)
+        self.merchant_id = self.config.get('merchant_id')
+        self.salt_key = self.config.get('salt_key')
+        self.salt_index = self.config.get('salt_index', 1)
+        self.base_url = self.config.get('base_url', 'https://api-preprod.phonepe.com/apis/pg-sandbox')
+    
     def create_payment(self, transaction: PaymentTransaction) -> Dict:
         """Create PhonePe payment"""
-        # Implement PhonePe integration
-        return {
-            'success': False,
-            'error': 'PhonePe integration not implemented'
-        }
+        try:
+            import base64
+            import requests
+            
+            # Create transaction ID
+            merchant_transaction_id = f"MT{transaction.transaction_id}"
+            
+            # Prepare payment request
+            payload = {
+                "merchantId": self.merchant_id,
+                "merchantTransactionId": merchant_transaction_id,
+                "merchantUserId": f"MU{transaction.user.id}",
+                "amount": int(transaction.amount * 100),  # Amount in paise
+                "redirectUrl": f"{settings.SITE_URL}/payments/phonepe/callback/",
+                "redirectMode": "POST",
+                "callbackUrl": f"{settings.SITE_URL}/payments/phonepe/webhook/",
+                "mobileNumber": getattr(transaction.user.profile, 'phone', '') if hasattr(transaction.user, 'profile') else '',
+                "paymentInstrument": {
+                    "type": "PAY_PAGE"
+                }
+            }
+            
+            # Encode payload
+            payload_json = json.dumps(payload)
+            payload_b64 = base64.b64encode(payload_json.encode()).decode()
+            
+            # Create checksum
+            string_to_hash = f"{payload_b64}/pg/v1/pay{self.salt_key}"
+            checksum = hashlib.sha256(string_to_hash.encode()).hexdigest() + "###" + str(self.salt_index)
+            
+            # Prepare request headers
+            headers = {
+                'Content-Type': 'application/json',
+                'X-VERIFY': checksum
+            }
+            
+            # Make API request
+            url = f"{self.base_url}/pg/v1/pay"
+            response = requests.post(
+                url,
+                json={"request": payload_b64},
+                headers=headers,
+                timeout=30
+            )
+            
+            response_data = response.json()
+            
+            if response.status_code == 200 and response_data.get('success'):
+                payment_url = response_data['data']['instrumentResponse']['redirectInfo']['url']
+                
+                return {
+                    'success': True,
+                    'transaction_id': merchant_transaction_id,
+                    'payment_url': payment_url,
+                    'gateway_data': {
+                        'merchant_transaction_id': merchant_transaction_id,
+                        'phonepe_transaction_id': response_data.get('data', {}).get('transactionId'),
+                        'payment_url': payment_url
+                    }
+                }
+            else:
+                error_message = response_data.get('message', 'PhonePe payment initiation failed')
+                logger.error(f"PhonePe payment failed: {error_message}")
+                return {
+                    'success': False,
+                    'error': error_message
+                }
+                
+        except requests.RequestException as e:
+            logger.error(f"PhonePe API request failed: {str(e)}")
+            return {
+                'success': False,
+                'error': 'Payment gateway communication error'
+            }
+        except Exception as e:
+            logger.error(f"PhonePe payment creation failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     def verify_payment(self, transaction: PaymentTransaction, response: Dict) -> Dict:
         """Verify PhonePe payment"""
-        return {
-            'success': False,
-            'error': 'PhonePe integration not implemented'
-        }
+        try:
+            import base64
+            import requests
+            
+            # Get merchant transaction ID from response or transaction metadata
+            merchant_transaction_id = response.get('merchantTransactionId') or response.get('transactionId')
+            if not merchant_transaction_id:
+                # Try to construct from transaction ID
+                merchant_transaction_id = f"MT{transaction.transaction_id}"
+            
+            # Create checksum for status check
+            string_to_hash = f"/pg/v1/status/{self.merchant_id}/{merchant_transaction_id}{self.salt_key}"
+            checksum = hashlib.sha256(string_to_hash.encode()).hexdigest() + "###" + str(self.salt_index)
+            
+            # Prepare request headers
+            headers = {
+                'Content-Type': 'application/json',
+                'X-VERIFY': checksum,
+                'X-MERCHANT-ID': self.merchant_id
+            }
+            
+            # Make status check API request
+            url = f"{self.base_url}/pg/v1/status/{self.merchant_id}/{merchant_transaction_id}"
+            status_response = requests.get(url, headers=headers, timeout=30)
+            status_data = status_response.json()
+            
+            if status_response.status_code == 200 and status_data.get('success'):
+                payment_data = status_data.get('data', {})
+                payment_state = payment_data.get('state')
+                
+                if payment_state == 'COMPLETED':
+                    return {
+                        'success': True,
+                        'gateway_transaction_id': payment_data.get('transactionId'),
+                        'response': payment_data
+                    }
+                elif payment_state == 'FAILED':
+                    return {
+                        'success': False,
+                        'error': payment_data.get('responseCodeDescription', 'Payment failed')
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': f"Payment in {payment_state} state"
+                    }
+            else:
+                error_message = status_data.get('message', 'Payment verification failed')
+                logger.error(f"PhonePe verification failed: {error_message}")
+                return {
+                    'success': False,
+                    'error': error_message
+                }
+                
+        except requests.RequestException as e:
+            logger.error(f"PhonePe verification API error: {str(e)}")
+            return {
+                'success': False,
+                'error': 'Payment verification communication error'
+            }
+        except Exception as e:
+            logger.error(f"PhonePe verification failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
     
     def process_refund(self, original: PaymentTransaction, refund: PaymentTransaction) -> Dict:
         """Process PhonePe refund"""
-        return {
-            'success': False,
-            'error': 'PhonePe integration not implemented'
-        }
+        try:
+            import base64
+            import requests
+            
+            # Create refund transaction ID
+            merchant_refund_id = f"RF{refund.transaction_id}"
+            original_transaction_id = f"MT{original.transaction_id}"
+            
+            # Prepare refund request
+            payload = {
+                "merchantId": self.merchant_id,
+                "merchantUserId": f"MU{original.user.id}",
+                "originalTransactionId": original_transaction_id,
+                "merchantTransactionId": merchant_refund_id,
+                "amount": int(refund.amount * 100),  # Amount in paise
+                "callbackUrl": f"{settings.SITE_URL}/payments/phonepe/refund-webhook/"
+            }
+            
+            # Encode payload
+            payload_json = json.dumps(payload)
+            payload_b64 = base64.b64encode(payload_json.encode()).decode()
+            
+            # Create checksum
+            string_to_hash = f"{payload_b64}/pg/v1/refund{self.salt_key}"
+            checksum = hashlib.sha256(string_to_hash.encode()).hexdigest() + "###" + str(self.salt_index)
+            
+            # Prepare request headers
+            headers = {
+                'Content-Type': 'application/json',
+                'X-VERIFY': checksum
+            }
+            
+            # Make refund API request
+            url = f"{self.base_url}/pg/v1/refund"
+            response = requests.post(
+                url,
+                json={"request": payload_b64},
+                headers=headers,
+                timeout=30
+            )
+            
+            response_data = response.json()
+            
+            if response.status_code == 200 and response_data.get('success'):
+                return {
+                    'success': True,
+                    'refund_id': merchant_refund_id,
+                    'response': response_data.get('data', {})
+                }
+            else:
+                error_message = response_data.get('message', 'PhonePe refund failed')
+                logger.error(f"PhonePe refund failed: {error_message}")
+                return {
+                    'success': False,
+                    'error': error_message
+                }
+                
+        except requests.RequestException as e:
+            logger.error(f"PhonePe refund API error: {str(e)}")
+            return {
+                'success': False,
+                'error': 'Refund gateway communication error'
+            }
+        except Exception as e:
+            logger.error(f"PhonePe refund failed: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
 
 class PayUProcessor(BaseGatewayProcessor):
-    """PayU payment processor"""
+    """PayU payment processor - COMMENTED OUT"""
     
     def create_payment(self, transaction: PaymentTransaction) -> Dict:
-        """Create PayU payment"""
-        # Implement PayU integration
+        """Create PayU payment - DISABLED"""
         return {
             'success': False,
-            'error': 'PayU integration not implemented'
+            'error': 'PayU gateway is currently disabled. Only PhonePe is active.'
         }
     
     def verify_payment(self, transaction: PaymentTransaction, response: Dict) -> Dict:
-        """Verify PayU payment"""
+        """Verify PayU payment - DISABLED"""
         return {
             'success': False,
-            'error': 'PayU integration not implemented'
+            'error': 'PayU gateway is currently disabled. Only PhonePe is active.'
         }
     
     def process_refund(self, original: PaymentTransaction, refund: PaymentTransaction) -> Dict:
-        """Process PayU refund"""
+        """Process PayU refund - DISABLED"""
         return {
             'success': False,
-            'error': 'PayU integration not implemented'
+            'error': 'PayU gateway is currently disabled. Only PhonePe is active.'
         }
 
 
 class CashfreeProcessor(BaseGatewayProcessor):
-    """Cashfree payment processor"""
+    """Cashfree payment processor - COMMENTED OUT"""
     
     def create_payment(self, transaction: PaymentTransaction) -> Dict:
-        """Create Cashfree payment"""
-        # Implement Cashfree integration
+        """Create Cashfree payment - DISABLED"""
         return {
             'success': False,
-            'error': 'Cashfree integration not implemented'
+            'error': 'Cashfree gateway is currently disabled. Only PhonePe is active.'
         }
     
     def verify_payment(self, transaction: PaymentTransaction, response: Dict) -> Dict:
-        """Verify Cashfree payment"""
+        """Verify Cashfree payment - DISABLED"""
         return {
             'success': False,
-            'error': 'Cashfree integration not implemented'
+            'error': 'Cashfree gateway is currently disabled. Only PhonePe is active.'
         }
     
     def process_refund(self, original: PaymentTransaction, refund: PaymentTransaction) -> Dict:
-        """Process Cashfree refund"""
+        """Process Cashfree refund - DISABLED"""
         return {
             'success': False,
-            'error': 'Cashfree integration not implemented'
+            'error': 'Cashfree gateway is currently disabled. Only PhonePe is active.'
         }
 
 

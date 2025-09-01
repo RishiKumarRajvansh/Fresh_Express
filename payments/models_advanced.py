@@ -3,15 +3,19 @@ Advanced Payment Integration System
 Supports multiple payment gateways, digital wallets, and hyperlocal payment methods
 """
 from django.db import models, transaction
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from core.models import TimeStampedModel
+from .models import PaymentMethod  # Import from basic models
 import uuid
 import hmac
 import hashlib
 import json
+
+User = get_user_model()
 
 
 class PaymentGateway(TimeStampedModel):
@@ -39,16 +43,21 @@ class PaymentGateway(TimeStampedModel):
     is_active = models.BooleanField(default=True)
     is_sandbox = models.BooleanField(default=True)
     supports_recurring = models.BooleanField(default=False)
+    supports_refunds = models.BooleanField(default=True)
+    supports_webhooks = models.BooleanField(default=True)
     min_amount = models.DecimalField(max_digits=10, decimal_places=2, default=1.00)
     max_amount = models.DecimalField(max_digits=10, decimal_places=2, default=100000.00)
     
     # Fee configuration
-    fixed_fee = models.DecimalField(max_digits=8, decimal_places=2, default=0.00)
-    percentage_fee = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    fee_fixed = models.DecimalField(max_digits=8, decimal_places=2, default=0.00, help_text="Fixed fee per transaction")
+    fee_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Percentage fee")
     
     # Regional settings
     supported_currencies = models.JSONField(default=list, help_text="List of supported currency codes")
     supported_countries = models.JSONField(default=list, help_text="List of supported country codes")
+    
+    # Additional gateway-specific configuration
+    additional_config = models.JSONField(default=dict, blank=True, help_text="Gateway-specific configuration")
     
     # Priority for gateway selection
     priority = models.PositiveIntegerField(default=10)
@@ -62,92 +71,31 @@ class PaymentGateway(TimeStampedModel):
     
     def calculate_fee(self, amount):
         """Calculate transaction fee for this gateway"""
-        percentage_amount = (amount * self.percentage_fee) / 100
-        return self.fixed_fee + percentage_amount
+        percentage_amount = (amount * self.fee_percentage) / 100
+        return self.fee_fixed + percentage_amount
     
     def get_api_config(self):
         """Get API configuration for this gateway"""
-        return {
+        config = {
             'api_key': self.api_key,
             'secret_key': self.secret_key,
             'merchant_id': self.merchant_id,
             'is_sandbox': self.is_sandbox
         }
-
-
-class PaymentMethod(TimeStampedModel):
-    """User's saved payment methods"""
-    PAYMENT_TYPES = [
-        ('card', 'Credit/Debit Card'),
-        ('upi', 'UPI'),
-        ('wallet', 'Digital Wallet'),
-        ('netbanking', 'Net Banking'),
-        ('cod', 'Cash on Delivery'),
-        ('bnpl', 'Buy Now Pay Later'),
-    ]
-    
-    CARD_TYPES = [
-        ('visa', 'Visa'),
-        ('mastercard', 'Mastercard'),
-        ('amex', 'American Express'),
-        ('rupay', 'RuPay'),
-        ('discover', 'Discover'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payment_methods')
-    payment_type = models.CharField(max_length=15, choices=PAYMENT_TYPES)
-    gateway = models.ForeignKey(PaymentGateway, on_delete=models.CASCADE)
-    
-    # Card details (encrypted)
-    card_type = models.CharField(max_length=15, choices=CARD_TYPES, blank=True)
-    last_four_digits = models.CharField(max_length=4, blank=True)
-    expiry_month = models.CharField(max_length=2, blank=True)
-    expiry_year = models.CharField(max_length=4, blank=True)
-    cardholder_name = models.CharField(max_length=100, blank=True)
-    
-    # UPI details
-    upi_id = models.CharField(max_length=100, blank=True)
-    
-    # Wallet details
-    wallet_provider = models.CharField(max_length=50, blank=True)
-    
-    # Bank details
-    bank_name = models.CharField(max_length=100, blank=True)
-    account_number_masked = models.CharField(max_length=20, blank=True)
-    
-    # Gateway-specific token
-    gateway_token = models.CharField(max_length=500, blank=True)
-    
-    # Settings
-    is_default = models.BooleanField(default=False)
-    is_verified = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    
-    # Metadata
-    billing_address = models.JSONField(default=dict)
-    metadata = models.JSONField(default=dict)
-    
-    class Meta:
-        unique_together = ['user', 'gateway_token']
-    
-    def __str__(self):
-        if self.payment_type == 'card':
-            return f"{self.card_type.title()} ending in {self.last_four_digits}"
-        elif self.payment_type == 'upi':
-            return f"UPI: {self.upi_id}"
-        elif self.payment_type == 'wallet':
-            return f"{self.wallet_provider} Wallet"
-        return f"{self.get_payment_type_display()}"
-    
-    def save(self, *args, **kwargs):
-        # Ensure only one default payment method per user
-        if self.is_default:
-            PaymentMethod.objects.filter(
-                user=self.user,
-                is_default=True
-            ).exclude(id=self.id).update(is_default=False)
         
-        super().save(*args, **kwargs)
+        # Add gateway-specific configuration
+        if hasattr(self, 'additional_config') and self.additional_config:
+            if self.gateway_type == 'phonepe':
+                config.update({
+                    'salt_key': self.secret_key,  # For PhonePe, secret_key is the salt_key
+                    'salt_index': self.additional_config.get('salt_index', 1),
+                    'base_url': self.additional_config.get('base_url', 
+                        'https://api-preprod.phonepe.com/apis/pg-sandbox' if self.is_sandbox 
+                        else 'https://api.phonepe.com/apis/hermes'
+                    )
+                })
+        
+        return config
 
 
 class PaymentTransaction(TimeStampedModel):
@@ -175,7 +123,7 @@ class PaymentTransaction(TimeStampedModel):
     
     # Associated order
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='transactions')
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     
     # Payment details
     payment_method = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT, null=True)

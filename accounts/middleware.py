@@ -27,6 +27,11 @@ class UserTypeAccessMiddleware:
             return self.get_response(request)
 
         path = request.path_info
+        
+        # Skip media files and static files - they should be accessible to all authenticated users
+        if path.startswith('/media/') or path.startswith('/static/'):
+            return self.get_response(request)
+        
         # Allow certain account endpoints for all authenticated users (logout, business login)
         # This prevents the middleware from blocking access to logout and business login pages.
         if path.startswith('/accounts/logout') or path.startswith('/accounts/email-login') or path.startswith('/accounts/business-register'):

@@ -66,39 +66,28 @@
                             </div>
                         </div>
 
-                        <!-- Product image carousel (show up to 5 images) -->
-                        {% with images=product.product.all_images|slice:":5" %}
-                        <div id="productCarousel-{{ product.id }}" class="carousel slide mb-3" data-bs-ride="carousel">
-                            <div class="carousel-inner" style="height:180px;">
-                                {% if images %}
-                                    {% for img in images %}
-                                    <div class="carousel-item {% if forloop.first %}active{% endif %}">
-                                        {% if img %}
-                                            <img src="{{ img.url }}" class="d-block w-100" alt="{{ product.product.name }}" style="height:180px; object-fit:cover;">
-                                        {% else %}
-                                            <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='100%' height='100%' fill='%23f8f9fa'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-family='Arial, sans-serif' font-size='20'>No image</text></svg>" class="d-block w-100" alt="No image" style="height:180px; object-fit:cover;">
-                                        {% endif %}
+                        <!-- Product image display -->
+                        <div class="mb-3">
+                            {% if product.product.image %}
+                                <img src="{{ product.product.image.url }}" class="d-block w-100" 
+                                     alt="{{ product.product.name }}" 
+                                     style="height:180px; object-fit:cover; border-radius: 8px;"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="d-none align-items-center justify-content-center bg-light" style="height:180px; border-radius: 8px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-image fa-3x mb-2"></i>
+                                        <div>Image failed to load</div>
                                     </div>
-                                    {% endfor %}
-                                {% else %}
-                                    <div class="carousel-item active">
-                                        <img src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='450' viewBox='0 0 800 450'><rect width='100%' height='100%' fill='%23f8f9fa'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-family='Arial, sans-serif' font-size='20'>No image</text></svg>" class="d-block w-100" alt="No image" style="height:180px; object-fit:cover;">
+                                </div>
+                            {% else %}
+                                <div class="d-flex align-items-center justify-content-center bg-light" style="height:180px; border-radius: 8px;">
+                                    <div class="text-center text-muted">
+                                        <i class="fas fa-image fa-3x mb-2"></i>
+                                        <div>No image available</div>
                                     </div>
-                                {% endif %}
-                            </div>
-
-                            {% if images and images|length > 1 %}
-                            <button class="carousel-control-prev" type="button" data-bs-target="#productCarousel-{{ product.id }}" data-bs-slide="prev">
-                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Previous</span>
-                            </button>
-                            <button class="carousel-control-next" type="button" data-bs-target="#productCarousel-{{ product.id }}" data-bs-slide="next">
-                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                <span class="visually-hidden">Next</span>
-                            </button>
+                                </div>
                             {% endif %}
                         </div>
-                        {% endwith %}
 
                         <p class="text-muted mb-2">{{ product.product.category.name }}</p>
                         <p class="mb-2">

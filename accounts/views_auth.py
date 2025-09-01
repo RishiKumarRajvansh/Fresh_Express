@@ -82,6 +82,9 @@ class CustomerRegistrationView(View):
         confirm_password = request.POST.get('confirm_password', '').strip()
         phone_number = request.POST.get('phone_number', '').strip()
         
+        # Get referral code from URL parameter
+        referral_code = request.GET.get('ref', '').strip()
+        
         context = {}
         
         # Validation
@@ -119,6 +122,19 @@ class CustomerRegistrationView(View):
         if phone_number and User.objects.filter(phone_number=phone_number).exists():
             context['error_message'] = 'An account with this phone number already exists.'
             return render(request, 'accounts/customer_register.html', context)
+
+        # Validate referral code if provided
+        referrer_user = None
+        if referral_code:
+            try:
+                # Extract user ID from referral code (format: REF123456)
+                if referral_code.startswith('REF') and len(referral_code) == 9:
+                    user_id = int(referral_code[3:])
+                    referrer_user = User.objects.get(id=user_id, user_type='customer')
+                else:
+                    context['warning_message'] = 'Invalid referral code. Registration will continue without referral bonus.'
+            except (ValueError, User.DoesNotExist):
+                context['warning_message'] = 'Invalid referral code. Registration will continue without referral bonus.'
         
         try:
             # Create user account
@@ -133,9 +149,37 @@ class CustomerRegistrationView(View):
                 email_verified=False  # Can be set to True if you don't want email verification
             )
             
+            # Create loyalty account
+            from .models import UserLoyaltyAccount
+            loyalty_account = UserLoyaltyAccount.objects.create(user=user)
+            
+            # Handle referral if valid
+            if referrer_user:
+                from .models import ReferralProgram
+                ReferralProgram.objects.create(
+                    referrer=referrer_user,
+                    referred=user
+                )
+                
+                # Give signup bonus to new user
+                loyalty_account.add_points(
+                    points=50,
+                    transaction_type='signup_bonus',
+                    reason='Welcome bonus for joining Fresh Express'
+                )
+                
+                messages.success(request, f'Account created successfully! You\'ve earned 50 welcome points. {referrer_user.first_name or referrer_user.username} will receive a bonus when you make your first order!')
+            else:
+                # Regular signup bonus
+                loyalty_account.add_points(
+                    points=25,
+                    transaction_type='signup_bonus',
+                    reason='Welcome bonus for joining Fresh Express'
+                )
+                messages.success(request, 'Account created successfully! You\'ve earned 25 welcome points.')
+            
             # Login user immediately
             login(request, user)
-            messages.success(request, 'Account created successfully! Welcome to Fresh Express.')
             return redirect('core:home')
             
         except Exception as e:
@@ -160,7 +204,7 @@ class EmailLoginView(View):
         return render(request, 'accounts/email_login.html', {'user_type': user_type})
     
     def post(self, request):
-        email = request.POST.get('email', '').strip()
+        email = request.POST.get('email', '').strip().lower()  # Convert to lowercase
         password = request.POST.get('password', '').strip()
         user_type = request.POST.get('user_type', 'store')
         
@@ -274,7 +318,7 @@ class StoreRegistrationView(View):
         # Get form data
         store_name = request.POST.get('store_name', '').strip()
         owner_name = request.POST.get('owner_name', '').strip()
-        email = request.POST.get('email', '').strip()
+        email = request.POST.get('email', '').strip().lower()  # Convert to lowercase
         phone = request.POST.get('phone', '').strip()
         address = request.POST.get('address', '').strip()
         city = request.POST.get('city', '').strip()
@@ -377,7 +421,7 @@ class DeliveryAgentRegistrationView(View):
     def post(self, request):
         # Get form data
         full_name = request.POST.get('full_name', '').strip()
-        email = request.POST.get('email', '').strip()
+        email = request.POST.get('email', '').strip().lower()  # Convert to lowercase
         phone_number = request.POST.get('phone_number', '').strip()
         emergency_contact = request.POST.get('emergency_contact', '').strip()
         address = request.POST.get('address', '').strip()

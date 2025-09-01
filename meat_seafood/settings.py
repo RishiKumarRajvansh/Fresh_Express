@@ -72,6 +72,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.global_context',
                 'core.context_processors.admin_context',
+                'core.banner_context.promotional_banners',
             ],
         },
     },
@@ -226,7 +227,37 @@ SMS_PROVIDER_URL = config('SMS_PROVIDER_URL', default='')
 # Google Maps API
 GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 
-# Payment Gateway
+# Base URL for callbacks and webhooks
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
+
+# Payment Gateway Configuration
+# PhonePe Configuration
+PHONEPE_MERCHANT_ID = config('PHONEPE_MERCHANT_ID', default='')
+PHONEPE_SALT_KEY = config('PHONEPE_SALT_KEY', default='')
+PHONEPE_SALT_INDEX = config('PHONEPE_SALT_INDEX', default=1, cast=int)
+PHONEPE_ENV = config('PHONEPE_ENV', default='SANDBOX')  # SANDBOX or PRODUCTION
+PHONEPE_BASE_URL = config('PHONEPE_BASE_URL', default='https://api-preprod.phonepe.com/apis/pg-sandbox')
+
+# Other Payment Gateways (Commented out for future use)
+# RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
+# RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
+
+# STRIPE_PUBLISHABLE_KEY = config('STRIPE_PUBLISHABLE_KEY', default='')
+# STRIPE_SECRET_KEY = config('STRIPE_SECRET_KEY', default='')
+
+# PAYTM_MERCHANT_ID = config('PAYTM_MERCHANT_ID', default='')
+# PAYTM_MERCHANT_KEY = config('PAYTM_MERCHANT_KEY', default='')
+# PAYTM_ENVIRONMENT = config('PAYTM_ENVIRONMENT', default='STAGING')
+
+# PAYU_MERCHANT_KEY = config('PAYU_MERCHANT_KEY', default='')
+# PAYU_MERCHANT_SALT = config('PAYU_MERCHANT_SALT', default='')
+# PAYU_ENV = config('PAYU_ENV', default='test')
+
+# CASHFREE_APP_ID = config('CASHFREE_APP_ID', default='')
+# CASHFREE_SECRET_KEY = config('CASHFREE_SECRET_KEY', default='')
+# CASHFREE_ENV = config('CASHFREE_ENV', default='TEST')
+
+# Legacy Payment Gateway (Keep for backward compatibility)
 PAYMENT_GATEWAY_KEY = config('PAYMENT_GATEWAY_KEY', default='')
 PAYMENT_GATEWAY_SECRET = config('PAYMENT_GATEWAY_SECRET', default='')
 
