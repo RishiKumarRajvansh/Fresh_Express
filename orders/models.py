@@ -129,6 +129,9 @@ class Order(TimeStampedModel):
     handover_to_delivery_time = models.DateTimeField(blank=True, null=True)
     delivery_agent_confirmed = models.BooleanField(default=False)
     store_handover_confirmed = models.BooleanField(default=False)
+    store_handover_time = models.DateTimeField(blank=True, null=True)
+    customer_delivery_confirmed = models.BooleanField(default=False) 
+    customer_delivery_time = models.DateTimeField(blank=True, null=True)
     handover_verification_code = models.CharField(max_length=6, blank=True, null=True)
     
     # Workflow Tracking Codes
@@ -158,8 +161,8 @@ class Order(TimeStampedModel):
                 pass
         
         if not self.order_number:
-            # Generate order number
-            self.order_number = 'ORD' + ''.join(random.choices(string.digits, k=8))
+            # Generate robust order number with collision detection
+            self.order_number = self._generate_unique_order_number()
         
         # Generate delivery confirmation code when order is placed (first time)
         if not self.delivery_confirmation_code and (is_new or self.status == 'placed'):
@@ -190,10 +193,160 @@ class Order(TimeStampedModel):
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to auto-assign delivery agent for order {self.order_number}: {str(e)}")
+
+    def _generate_unique_order_number(self):
+        """
+        Generate a unique order number with format: ORD-USERID-YYYYMMDD-HHMMSS-XXX
+        Example: ORD-123-20250902-143022-001
+        """
+        from django.utils import timezone
+        
+        max_attempts = 50
+        for attempt in range(max_attempts):
+            now = timezone.now()
+            
+            # Format: ORD-{user_id}-{date}-{time}-{sequence}
+            date_str = now.strftime('%Y%m%d')
+            time_str = now.strftime('%H%M%S')
+            user_id = str(self.user.id).zfill(3)  # Pad user ID to 3 digits
+            sequence = str(attempt + 1).zfill(3)  # 3-digit sequence for collision handling
+            
+            candidate = f'ORD-{user_id}-{date_str}-{time_str}-{sequence}'
+            
+            # Check if this order number already exists
+            if not Order.objects.filter(order_number=candidate).exists():
+                return candidate
+        
+        # Fallback: Use UUID if all attempts fail
+        import uuid
+        return f'ORD-{str(uuid.uuid4())[:8].upper()}'
     
     @property
     def can_cancel(self):
         return self.status in ['placed', 'confirmed'] and self.payment_status != 'paid'
+    
+    def get_customer_friendly_status(self):
+        """Return customer-friendly status messages"""
+        customer_statuses = {
+            'placed': '✅ Order Confirmed',
+            'confirmed': '👨‍🍳 Preparing Your Order',
+            'preparing': '👨‍🍳 Cooking Fresh for You',
+            'packed': '📦 Ready for Delivery',
+            'ready_for_pickup': '🚚 Out for Delivery',
+            'handed_to_delivery': '🚚 On the Way',
+            'out_for_delivery': '🚚 Out for Delivery',
+            'delivered': '✅ Delivered',
+            'cancelled': '❌ Cancelled',
+            'refunded': '💰 Refunded',
+        }
+        return customer_statuses.get(self.status, self.get_status_display())
+    
+    def get_status_description(self):
+        """Return detailed status description for customers"""
+        descriptions = {
+            'placed': 'Your order has been received and is being processed.',
+            'confirmed': 'Your order has been confirmed and we are starting to prepare it.',
+            'preparing': 'Our chef is preparing your fresh order with care.',
+            'packed': 'Your order is packed and ready for delivery.',
+            'ready_for_pickup': 'Your order is out for delivery and will reach you soon.',
+            'handed_to_delivery': 'Your order has been handed to our delivery agent.',
+            'out_for_delivery': 'Your order is on its way to your location.',
+            'delivered': 'Your order has been successfully delivered. Enjoy your meal!',
+            'cancelled': 'This order has been cancelled.',
+            'refunded': 'Refund has been processed for this order.',
+        }
+        return descriptions.get(self.status, 'Order status updated.')
+    
+    def can_be_cancelled(self):
+        """Check if order can be cancelled - only until confirmed status"""
+        # Can cancel only if not yet preparing  
+        cancellable_statuses = ['placed', 'confirmed']
+        return self.status in cancellable_statuses
+    
+    def can_be_refunded(self):
+        """Check if order can be refunded - only for prepaid orders until confirmed status"""
+        # Can refund only if payment was made (not COD) and order is still cancellable
+        # After confirmed status, refunds are only processed through customer service
+        return (
+            self.payment_status == 'paid' and 
+            self.payment_method != 'cod' and
+            self.status in ['placed', 'confirmed']  # Only until confirmed status
+        )
+    
+    def cancel_order(self, cancelled_by=None, reason="", details=""):
+        """Cancel the order with reason and return success status"""
+        try:
+            if not self.can_be_cancelled():
+                return False, f"Cannot cancel order with status: {self.status}"
+            
+            old_status = self.status
+            self.status = 'cancelled'
+            self.save()
+            
+            # Create status history entry
+            OrderStatusHistory.objects.create(
+                order=self,
+                status='cancelled',
+                updated_by=cancelled_by,
+                notes=f"Order cancelled. Reason: {reason}. {details}".strip()
+            )
+            
+            # If prepaid order, initiate automatic refund
+            refund_message = ""
+            if self.payment_method == 'prepaid' and self.payment_status == 'paid':
+                try:
+                    refund_success, refund_msg = self.initiate_refund(cancelled_by, f"Automatic refund for cancelled order. {reason}")
+                    if refund_success:
+                        refund_message = " Automatic refund has been processed."
+                    else:
+                        refund_message = f" Note: Refund failed - {refund_msg}"
+                except Exception as e:
+                    refund_message = f" Note: Refund processing failed - {str(e)}"
+            
+            return True, f"Order cancelled successfully.{refund_message}"
+            
+        except Exception as e:
+            return False, f"Error cancelling order: {str(e)}"
+    
+    def initiate_refund(self, initiated_by=None, amount=None, reason="", details=""):
+        """Initiate refund for orders with amount and reason"""
+        try:
+            if not self.can_be_refunded():
+                return False, "This order is not eligible for refund"
+            
+            # Default amount is full order amount
+            if amount is None:
+                amount = float(self.total_amount)
+            
+            # Validate refund amount
+            if amount <= 0 or amount > float(self.total_amount):
+                return False, f"Invalid refund amount. Must be between 0 and {self.total_amount}"
+            
+            # Update payment status
+            old_payment_status = self.payment_status
+            self.payment_status = 'refunded'
+            
+            # Update order status if not already cancelled
+            if self.status not in ['cancelled', 'refunded']:
+                self.status = 'refunded'
+                
+            self.save()
+            
+            # Create status history entry
+            OrderStatusHistory.objects.create(
+                order=self,
+                status='refunded',
+                updated_by=initiated_by,
+                notes=f"Refund of ₹{amount} processed. Reason: {reason}. {details}".strip()
+            )
+            
+            # TODO: Integrate with actual payment gateway
+            # For now, just update status and create history
+            
+            return True, f"Refund of ₹{amount} has been processed successfully. It will reflect in the original payment method within 3-5 business days."
+            
+        except Exception as e:
+            return False, f"Error processing refund: {str(e)}"
     
     class Meta:
         ordering = ['-created_at']

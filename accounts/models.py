@@ -397,26 +397,6 @@ class UserRewardRedemption(models.Model):
         super().save(*args, **kwargs)
 
 
-class ReferralProgram(models.Model):
-    """Referral program management"""
-    referrer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referrals_made')
-    referred = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referred_by_user')
-    
-    # Bonus tracking
-    referrer_bonus_given = models.BooleanField(default=False)
-    referred_bonus_given = models.BooleanField(default=False)
-    
-    # First order tracking
-    referred_first_order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, blank=True, null=True)
-    bonus_awarded_at = models.DateTimeField(blank=True, null=True)
-    
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    def __str__(self):
-        return f"{self.referrer.username} referred {self.referred.username}"
-
-
 class LoyaltyConfiguration(models.Model):
     """Dynamic loyalty program configuration"""
     name = models.CharField(max_length=100, default="Default Loyalty Program")

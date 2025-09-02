@@ -115,21 +115,53 @@ class Store(TimeStampedModel):
 class StoreStaff(TimeStampedModel):
     """Staff members for stores"""
     STAFF_ROLES = [
-        ('manager', 'Manager'),
         ('staff', 'Staff'),
-        ('inventory_manager', 'Inventory Manager'),
     ]
     
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    staff_id = models.CharField(max_length=20, default='STAFF001', help_text="Unique staff ID for this store")
     role = models.CharField(max_length=20, choices=STAFF_ROLES, default='staff')
     is_active = models.BooleanField(default=True)
+    
+    def save(self, *args, **kwargs):
+        if not self.staff_id:
+            # Generate staff ID: ST + store_id + 3-digit number
+            existing_count = StoreStaff.objects.filter(store=self.store).count()
+            self.staff_id = f"ST{self.store.id:03d}{existing_count + 1:03d}"
+        super().save(*args, **kwargs)
     
     def __str__(self):
         return f"{self.user.username} - {self.store.name} ({self.get_role_display()})"
     
     class Meta:
-        unique_together = ['store', 'user']
+        unique_together = [['store', 'user'], ['store', 'staff_id']]
+
+class StaffOrderAssignment(TimeStampedModel):
+    """Assignment of orders to store staff for processing"""
+    ASSIGNMENT_STATUS = [
+        ('assigned', 'Assigned'),
+        ('accepted', 'Accepted'),
+        ('in_progress', 'In Progress'), 
+        ('packed', 'Packed'),
+        ('ready_for_delivery', 'Ready for Delivery'),
+        ('completed', 'Completed'),
+    ]
+    
+    order = models.OneToOneField('orders.Order', on_delete=models.CASCADE, related_name='staff_assignment')
+    staff = models.ForeignKey(StoreStaff, on_delete=models.CASCADE, related_name='assigned_orders')
+    assigned_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='staff_assignments_made')
+    status = models.CharField(max_length=20, choices=ASSIGNMENT_STATUS, default='assigned')
+    assigned_at = models.DateTimeField(auto_now_add=True)
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    
+    def __str__(self):
+        return f"Order {self.order.order_number} → {self.staff.user.get_full_name()}"
+    
+    class Meta:
+        ordering = ['-assigned_at']
 
 class StoreZipCoverage(TimeStampedModel):
     """Store coverage for specific ZIP codes with custom settings"""

@@ -20,31 +20,32 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 import json
 
-from .models import Store
+from .models import Store, StaffOrderAssignment
 from orders.models import Order, OrderStatusHistory
 from orders.services import OrderStatusService, OrderWorkflowService, OrderAnalyticsService
 from core.decorators import store_required, StoreRequiredMixin
 
 
 class StoreOrderDashboardView(StoreRequiredMixin, TemplateView):
-    """Enhanced store order dashboard with real-time updates"""
+    """Enhanced store order dashboard with real-time updates - Store Owner Only"""
     template_name = 'stores/orders/dashboard.html'
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Only allow store owners, not staff
+        if request.user.user_type == 'store_staff':
+            messages.error(request, 'Staff members should use the staff dashboard instead.')
+            return redirect('stores:staff_dashboard')
+        return super().dispatch(request, *args, **kwargs)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Get the store for the current user
+        # Get the store for the current user (owners only)
         try:
             store = Store.objects.get(owner=self.request.user)
         except Store.DoesNotExist:
-            # Check if user is staff member
-            try:
-                store = Store.objects.filter(staff=self.request.user).first()
-                if not store:
-                    raise Store.DoesNotExist
-            except:
-                messages.error(self.request, 'No store found for your account.')
-                return context
+            messages.error(self.request, 'No store found for your account.')
+            return context
         
         context['store'] = store
         
@@ -96,23 +97,25 @@ class StoreOrderDashboardView(StoreRequiredMixin, TemplateView):
 
 
 class StoreOrderListView(StoreRequiredMixin, ListView):
-    """Enhanced store order list with advanced filtering"""
+    """Enhanced store order list with advanced filtering - Store Owner Only"""
     model = Order
     template_name = 'stores/orders/list.html'
     context_object_name = 'orders'
     paginate_by = 25
     
+    def dispatch(self, request, *args, **kwargs):
+        # Only allow store owners, not staff
+        if request.user.user_type == 'store_staff':
+            messages.error(request, 'Staff members can only view orders assigned to them. Please use the staff orders page.')
+            return redirect('stores:staff_orders')
+        return super().dispatch(request, *args, **kwargs)
+    
     def get_queryset(self):
-        # Get the store for the current user
+        # Get the store for the current user (owners only)
         try:
             store = Store.objects.get(owner=self.request.user)
         except Store.DoesNotExist:
-            try:
-                store = Store.objects.filter(staff=self.request.user).first()
-                if not store:
-                    return Order.objects.none()
-            except:
-                return Order.objects.none()
+            return Order.objects.none()
         
         queryset = Order.objects.filter(store=store).select_related(
             'user', 'delivery_address'
@@ -166,7 +169,7 @@ class StoreOrderListView(StoreRequiredMixin, ListView):
         try:
             store = Store.objects.get(owner=self.request.user)
         except Store.DoesNotExist:
-            store = Store.objects.filter(staff=self.request.user).first()
+            store = Store.objects.filter(storestaff__user=self.request.user).first()
         
         context['store'] = store
         context['order_statuses'] = Order.ORDER_STATUS
@@ -183,21 +186,26 @@ class StoreOrderListView(StoreRequiredMixin, ListView):
 
 
 class StoreOrderDetailView(StoreRequiredMixin, DetailView):
-    """Enhanced store order detail with management capabilities"""
+    """Enhanced store order detail with management capabilities - Store Owner Only"""
     model = Order
     template_name = 'stores/orders/detail.html'
     context_object_name = 'order'
     slug_field = 'order_number'
     slug_url_kwarg = 'order_number'
     
+    def dispatch(self, request, *args, **kwargs):
+        # Only allow store owners, not staff
+        if request.user.user_type == 'store_staff':
+            # Redirect to staff order detail instead
+            return redirect('stores:staff_order_detail', order_number=kwargs['order_number'])
+        return super().dispatch(request, *args, **kwargs)
+    
     def get_queryset(self):
-        # Limit to orders from the user's store
+        # Limit to orders from the user's store (owners only)
         try:
             store = Store.objects.get(owner=self.request.user)
         except Store.DoesNotExist:
-            store = Store.objects.filter(staff=self.request.user).first()
-            if not store:
-                return Order.objects.none()
+            return Order.objects.none()
         
         return Order.objects.filter(store=store).select_related(
             'user', 'store', 'delivery_address'
@@ -230,6 +238,12 @@ class StoreOrderDetailView(StoreRequiredMixin, DetailView):
         if hasattr(order, 'delivery_assignment'):
             context['delivery_info'] = order.delivery_assignment
         
+        # Add staff assignment information if available
+        try:
+            context['staff_assignment'] = order.stafforderassignment
+        except:
+            context['staff_assignment'] = None
+        
         return context
     
     def _calculate_preparation_time(self, order):
@@ -251,7 +265,7 @@ class StoreOrderStatusUpdateView(View):
             try:
                 store = Store.objects.get(owner=request.user)
             except Store.DoesNotExist:
-                store = Store.objects.filter(staff=request.user).first()
+                store = Store.objects.filter(storestaff__user=request.user).first()
                 if not store:
                     return JsonResponse({'success': False, 'message': 'Store not found'})
             
@@ -308,7 +322,7 @@ class StoreBulkOrderActionsView(View):
             try:
                 store = Store.objects.get(owner=request.user)
             except Store.DoesNotExist:
-                store = Store.objects.filter(staff=request.user).first()
+                store = Store.objects.filter(storestaff__user=request.user).first()
                 if not store:
                     return JsonResponse({'success': False, 'message': 'Store not found'})
             
@@ -400,7 +414,7 @@ def store_order_analytics_api(request):
         try:
             store = Store.objects.get(owner=request.user)
         except Store.DoesNotExist:
-            store = Store.objects.filter(staff=request.user).first()
+            store = Store.objects.filter(storestaff__user=request.user).first()
             if not store:
                 return JsonResponse({'success': False, 'message': 'Store not found'})
         

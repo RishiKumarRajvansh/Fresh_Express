@@ -1,0 +1,162 @@
+{% extends 'base_mobile.html' %}
+{% load static %}
+
+{% block title %}Staff Management - {{ store.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .staff-header {
+        background: linear-gradient(135deg, #D32F2F, #8B0000);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .staff-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        padding: 20px;
+        margin-bottom: 20px;
+        transition: transform 0.3s ease;
+    }
+    
+    .staff-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .staff-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .staff-details h5 {
+        margin: 0;
+        color: #D32F2F;
+    }
+    
+    .staff-details p {
+        margin: 5px 0;
+        color: #666;
+    }
+    
+    .staff-actions {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .btn-staff {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .btn-edit {
+        background: #FF6B35;
+        color: white;
+    }
+    
+    .btn-delete {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-add-staff {
+        background: linear-gradient(135deg, #FF6B35, #FFA726);
+        color: white;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-weight: 600;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);
+    }
+    
+    .role-badge {
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    
+    .role-manager { background: #e3f2fd; color: #1976d2; }
+    .role-staff { background: #f3e5f5; color: #7b1fa2; }
+    .role-inventory_manager { background: #e8f5e8; color: #388e3c; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="staff-header">
+        <h2><i class="fas fa-users"></i> Staff Management</h2>
+        <p>Manage {{ store.name }} staff members</p>
+    </div>
+    
+    <!-- Add Staff Button -->
+    <div class="text-center mb-4">
+        <a href="{% url 'stores:staff_create' %}" class="btn-add-staff">
+            <i class="fas fa-plus"></i>
+            Add New Staff Member
+        </a>
+    </div>
+    
+    <!-- Staff List -->
+    {% if staff_members %}
+        {% for staff in staff_members %}
+        <div class="staff-card">
+            <div class="staff-info">
+                <div class="staff-details">
+                    <h5>{{ staff.user.get_full_name }}</h5>
+                    <p><strong>Staff ID:</strong> {{ staff.staff_id }}</p>
+                    <p><strong>Email:</strong> {{ staff.user.email }}</p>
+                    {% if staff.user.phone_number %}
+                    <p><strong>Phone:</strong> {{ staff.user.phone_number }}</p>
+                    {% endif %}
+                    <span class="role-badge role-{{ staff.role }}">{{ staff.get_role_display }}</span>
+                </div>
+                
+                <div class="staff-actions">
+                    <a href="{% url 'stores:staff_detail' staff.pk %}" class="btn-staff btn-edit">
+                        <i class="fas fa-edit"></i> Edit
+                    </a>
+                    <a href="{% url 'stores:staff_delete' staff.pk %}" class="btn-staff btn-delete">
+                        <i class="fas fa-trash"></i> Remove
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">No Staff Members</h4>
+            <p class="text-muted">Add your first staff member to get started.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add confirmation for delete actions
+    document.querySelectorAll('.btn-delete').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            if (!confirm('Are you sure you want to remove this staff member?')) {
+                e.preventDefault();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

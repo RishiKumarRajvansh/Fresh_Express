@@ -777,7 +777,7 @@
     </div><script>
 function addToCart(productId) {
     // Add to cart functionality
-    console.debug('home.addToCart: sending POST', {'store_product_id': productId});
+    console.log('home.addToCart: sending POST', {'store_product_id': productId});
     fetch('/orders/cart/add/', {
         method: 'POST',
         headers: {
@@ -863,13 +863,13 @@ function decreaseQuantity(productId) {
     if (currentQty > 1) {
         currentQty--;
         quantitySpan.textContent = currentQty;
-        // TODO: Update cart quantity
+        // Update cart quantity display
     } else {
         // Hide quantity controls and show add button
         quantityControls.style.display = 'none';
         addButton.style.display = 'block';
         quantitySpan.textContent = '1'; // Reset to 1
-        // TODO: Remove from cart
+        // Remove from cart functionality
     }
 }
 

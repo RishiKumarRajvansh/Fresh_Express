@@ -210,7 +210,7 @@
                     <h5 class="mb-0">Quick Actions</h5>
                 </div>
                 <div class="card-body">
-                    {% if next_statuses %}
+                    {% if next_statuses and order.status != 'out_for_delivery' and order.status != 'delivered' %}
                         <div class="mb-3">
                             <label class="form-label">Update Status</label>
                             <select class="form-select" id="statusSelect">
@@ -223,6 +223,18 @@
                         <button type="button" class="btn btn-primary w-100 mb-2" id="updateStatusBtn">
                             <i class="fas fa-sync-alt me-2"></i>Update Status
                         </button>
+                    {% elif order.status == 'out_for_delivery' %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-truck me-2"></i>
+                            <strong>Order with Delivery Agent</strong><br>
+                            <small>Status updates are now handled by the delivery agent via OTP verification.</small>
+                        </div>
+                    {% elif order.status == 'delivered' %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Order Completed</strong><br>
+                            <small>This order has been successfully delivered.</small>
+                        </div>
                     {% endif %}
                     
                     <div class="d-grid gap-2">
@@ -232,14 +244,134 @@
                         <button type="button" class="btn btn-outline-info action-btn" data-bs-toggle="modal" data-bs-target="#notesModal">
                             <i class="fas fa-sticky-note me-2"></i>Add Notes
                         </button>
-                        {% if order.status == 'placed' %}
-                        <button type="button" class="btn btn-outline-danger action-btn" onclick="cancelOrder()">
-                            <i class="fas fa-times me-2"></i>Cancel Order
+                        
+                        <!-- Cancel/Refund Options -->
+                        {% if order.can_be_cancelled %}
+                        <button type="button" class="btn btn-outline-warning action-btn" onclick="showCancelModal()">
+                            <i class="fas fa-times-circle me-2"></i>Cancel Order
+                        </button>
+                        {% endif %}
+                        
+                        {% if order.can_be_refunded %}
+                        <button type="button" class="btn btn-outline-danger action-btn" onclick="showRefundModal()">
+                            <i class="fas fa-money-bill-wave me-2"></i>Process Refund
                         </button>
                         {% endif %}
                     </div>
                 </div>
             </div>
+
+            <!-- Staff Assignment Card -->
+            {% if order.status == 'pending' or order.status == 'confirmed' %}
+            <div class="card order-detail-card mb-4 border-primary">
+                <div class="card-header bg-primary bg-opacity-10 border-0 pb-0">
+                    <h5 class="mb-0 text-primary">
+                        <i class="fas fa-user-tie me-2"></i>Staff Assignment
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if order.stafforderassignment %}
+                        <div class="alert alert-success">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <div>
+                                    <strong>Assigned to: {{ order.stafforderassignment.staff.user.get_full_name }}</strong><br>
+                                    <small>{{ order.stafforderassignment.staff.get_role_display }} • {{ order.stafforderassignment.assigned_at|date:"M d, H:i" }}</small>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <span class="badge bg-info">{{ order.stafforderassignment.get_status_display }}</span>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-3">Assign this order to a staff member for preparation.</p>
+                        <form id="assignStaffForm">
+                            <input type="hidden" name="order_id" value="{{ order.id }}">
+                            <div class="mb-3">
+                                <label for="staff_id" class="form-label">Select Staff Member</label>
+                                <select class="form-select" name="staff_id" required>
+                                    <option value="">Choose staff member...</option>
+                                    {% for staff in store.storestaff_set.all %}
+                                        {% if staff.is_active %}
+                                        <option value="{{ staff.id }}">
+                                            {{ staff.user.get_full_name }} ({{ staff.get_role_display }})
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-user-plus me-2"></i>Assign to Staff
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Delivery Agent Assignment Card -->
+            {% if order.status == 'packed' %}
+            <div class="card order-detail-card mb-4 border-warning">
+                <div class="card-header bg-warning bg-opacity-10 border-0 pb-0">
+                    <h5 class="mb-0 text-warning">🚚 Ready for Delivery Assignment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <p class="mb-2">
+                                <strong>Order is packed and ready!</strong><br>
+                                <small class="text-muted">Assign a delivery agent to start the delivery process.</small>
+                            </p>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-success">{{ order.items.count }} item{{ order.items.count|pluralize }} packed</span>
+                                <span class="badge bg-info">₹{{ order.total_amount }} total value</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <a href="{% url 'delivery:manual_assignment' order.order_id %}" class="btn btn-warning btn-lg">
+                                <i class="fas fa-truck me-2"></i>
+                                <strong>Assign Delivery Agent</strong>
+                            </a>
+                            <p class="small text-muted mt-1 mb-0">
+                                Select from available agents
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% elif order.status == 'ready_for_pickup' and order.delivery_assignment %}
+            <div class="card order-detail-card mb-4 border-success">
+                <div class="card-header bg-success bg-opacity-10 border-0 pb-0">
+                    <h5 class="mb-0 text-success">✅ Delivery Agent Assigned</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <p class="mb-2">
+                                <strong>{{ order.delivery_assignment.agent.user.get_full_name }}</strong><br>
+                                <small class="text-muted">
+                                    <i class="fas fa-phone me-1"></i> {{ order.delivery_assignment.agent.user.phone|default:"No phone" }}
+                                    <span class="mx-2">•</span>
+                                    <i class="fas fa-clock me-1"></i> Assigned {{ order.delivery_assignment.assigned_at|timesince }} ago
+                                </small>
+                            </p>
+                            <div class="d-flex gap-2">
+                                <span class="badge bg-success">Agent assigned</span>
+                                <span class="badge bg-info">Ready for pickup</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 text-md-end">
+                            <button class="btn btn-outline-success" onclick="contactAgent()">
+                                <i class="fas fa-phone me-2"></i>Contact Agent
+                            </button>
+                            <p class="small text-muted mt-1 mb-0">
+                                Agent will pick up soon
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Status Timeline Card -->
             <div class="card order-detail-card mb-4">
@@ -302,20 +434,79 @@
     </div>
 </div>
 
-<!-- Notes Modal -->
+<!-- Enhanced Notes Modal -->
 <div class="modal fade" id="notesModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Order Notes</h5>
+            <div class="modal-header bg-light">
+                <h5 class="modal-title">
+                    <i class="fas fa-sticky-note text-primary me-2"></i>
+                    Order Notes & Communication
+                </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <textarea class="form-control" id="orderNotes" rows="4" placeholder="Enter notes about this order..."></textarea>
+                <div class="row">
+                    <div class="col-md-12">
+                        <h6 class="mb-3">📝 Add New Note</h6>
+                        
+                        <!-- Note Type Selection -->
+                        <div class="mb-3">
+                            <label class="form-label">Note Type:</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="noteType" id="internal" value="internal" checked>
+                                <label class="btn btn-outline-secondary" for="internal">
+                                    <i class="fas fa-users me-1"></i> Internal Note
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="noteType" id="customer" value="customer">
+                                <label class="btn btn-outline-primary" for="customer">
+                                    <i class="fas fa-user me-1"></i> Customer Message
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="noteType" id="delivery" value="delivery">
+                                <label class="btn btn-outline-warning" for="delivery">
+                                    <i class="fas fa-truck me-1"></i> Delivery Instructions
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- Note Content -->
+                        <div class="mb-3">
+                            <label class="form-label">Note Content:</label>
+                            <textarea class="form-control" id="orderNotes" rows="4" 
+                                placeholder="Enter your note here..." 
+                                onchange="updatePreview()"></textarea>
+                            <div class="form-text">
+                                <span id="noteTypeHelp">Internal notes are only visible to store staff</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Quick Templates -->
+                        <div class="mb-3">
+                            <label class="form-label">Quick Templates:</label>
+                            <div class="btn-group-vertical w-100" id="quickTemplates">
+                                <!-- Templates will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <!-- Preview -->
+                        <div class="mb-3" id="notePreview" style="display: none;">
+                            <label class="form-label">Preview:</label>
+                            <div class="bg-light p-3 rounded border">
+                                <span id="previewContent"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveNotes()">Save Notes</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveNotes()">
+                    <i class="fas fa-save me-1"></i> Save Note
+                </button>
             </div>
         </div>
     </div>
@@ -323,6 +514,114 @@
 {% endblock %}
 
 {% block extra_js %}
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning bg-opacity-10 border-0">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Cancel Order</h5>
+                    <small class="text-muted">This action cannot be undone</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="cancelForm" method="post" action="{% url 'stores:cancel_order' order.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Cancellation Reason</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="">Select reason...</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="customer_request">Customer Request</option>
+                            <option value="store_issue">Store Issue</option>
+                            <option value="payment_issue">Payment Issue</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Additional Details</label>
+                        <textarea name="details" class="form-control" rows="3" placeholder="Provide additional details (optional)"></textarea>
+                    </div>
+                    <div class="alert alert-warning d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>Note:</strong> 
+                            {% if order.payment_type == 'prepaid' %}
+                            This prepaid order will be automatically refunded after cancellation.
+                            {% else %}
+                            This cash-on-delivery order can be cancelled without refund processing.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep Order</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-times-circle me-2"></i>Cancel Order
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Modal -->
+<div class="modal fade" id="refundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger bg-opacity-10 border-0">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="fas fa-money-bill-wave text-danger me-2"></i>Process Refund</h5>
+                    <small class="text-muted">Refund for delivered order</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="refundForm" method="post" action="{% url 'stores:process_refund' order.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Reason</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="">Select reason...</option>
+                            <option value="quality_issue">Quality Issue</option>
+                            <option value="wrong_item">Wrong Item Delivered</option>
+                            <option value="customer_dissatisfied">Customer Dissatisfied</option>
+                            <option value="damaged_product">Damaged Product</option>
+                            <option value="store_error">Store Error</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">₹</span>
+                            <input type="number" name="amount" class="form-control" step="0.01" max="{{ order.total_amount }}" value="{{ order.total_amount }}" required>
+                        </div>
+                        <small class="text-muted">Maximum refund: ₹{{ order.total_amount }}</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Details</label>
+                        <textarea name="details" class="form-control" rows="3" placeholder="Provide details about the refund reason" required></textarea>
+                    </div>
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>Refund Processing:</strong> The refund will be processed to the original payment method within 3-5 business days.
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-money-bill-wave me-2"></i>Process Refund
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Status update functionality
@@ -340,7 +639,129 @@ document.addEventListener('DOMContentLoaded', function() {
             updateOrderStatus(newStatus);
         });
     }
+    
+    // Staff assignment functionality
+    const assignStaffForm = document.getElementById('assignStaffForm');
+    if (assignStaffForm) {
+        assignStaffForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            // Show loading state
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Assigning...';
+            submitBtn.disabled = true;
+            
+            fetch("{% url 'stores:assign_order_to_staff' %}", {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(`Order assigned to ${data.staff_name} successfully!`, 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 1000);
+                } else {
+                    showAlert(data.error || 'Failed to assign order to staff.', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('An error occurred while assigning the order.', 'danger');
+            })
+            .finally(() => {
+                // Restore button state
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            });
+        });
+    }
+    
+    // Enhanced Notes functionality
+    initializeNotesSystem();
 });
+
+function initializeNotesSystem() {
+    // Quick templates based on note type
+    const templates = {
+        internal: [
+            'Customer requested special preparation',
+            'Order packed with extra care',
+            'Customer called to confirm address',
+            'Delayed due to ingredient shortage'
+        ],
+        customer: [
+            'Your order is being prepared with fresh ingredients',
+            'Thank you for choosing us! Your order will be ready soon',
+            'We are taking extra care to ensure quality',
+            'Your order is ready for delivery'
+        ],
+        delivery: [
+            'Ring doorbell twice',
+            'Leave at gate if no answer',
+            'Customer prefers contact before delivery',
+            'Handle with care - fragile items'
+        ]
+    };
+    
+    // Note type change handler
+    document.querySelectorAll('input[name="noteType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            updateQuickTemplates(this.value, templates);
+            updateNoteTypeHelp(this.value);
+        });
+    });
+    
+    // Initialize with internal templates
+    updateQuickTemplates('internal', templates);
+}
+
+function updateQuickTemplates(noteType, templates) {
+    const quickTemplatesContainer = document.getElementById('quickTemplates');
+    quickTemplatesContainer.innerHTML = '';
+    
+    templates[noteType].forEach(template => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-secondary mb-1 text-start';
+        btn.textContent = template;
+        btn.onclick = () => {
+            document.getElementById('orderNotes').value = template;
+            updatePreview();
+        };
+        quickTemplatesContainer.appendChild(btn);
+    });
+}
+
+function updateNoteTypeHelp(noteType) {
+    const helpTexts = {
+        internal: 'Internal notes are only visible to store staff',
+        customer: 'Customer messages will be sent as SMS/notification',
+        delivery: 'Delivery instructions will be shared with delivery agent'
+    };
+    
+    document.getElementById('noteTypeHelp').textContent = helpTexts[noteType];
+}
+
+function updatePreview() {
+    const noteContent = document.getElementById('orderNotes').value;
+    const preview = document.getElementById('notePreview');
+    const previewContent = document.getElementById('previewContent');
+    
+    if (noteContent.trim()) {
+        previewContent.textContent = noteContent;
+        preview.style.display = 'block';
+    } else {
+        preview.style.display = 'none';
+    }
+}
 
 function updateOrderStatus(newStatus) {
     // Get CSRF token
@@ -367,14 +788,14 @@ function updateOrderStatus(newStatus) {
     .then(data => {
         if (data.success) {
             // Show success message
-            showAlert('Status updated successfully!', 'success');
+            showAlert(data.message || 'Status updated successfully!', 'success');
             
             // Reload the page to show updated status
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
         } else {
-            showAlert(data.error || 'Failed to update status.', 'danger');
+            showAlert(data.message || 'Failed to update status.', 'danger');
         }
     })
     .catch(error => {
@@ -480,23 +901,211 @@ function cancelOrder() {
     }
 }
 
+function showCancelModal() {
+    const cancelModal = new bootstrap.Modal(document.getElementById('cancelModal'));
+    cancelModal.show();
+}
+
+function showRefundModal() {
+    const refundModal = new bootstrap.Modal(document.getElementById('refundModal'));
+    refundModal.show();
+}
+
 function saveNotes() {
     const notes = document.getElementById('orderNotes').value.trim();
+    const noteType = document.querySelector('input[name="noteType"]:checked').value;
+    
     if (!notes) {
         alert('Please enter some notes.');
         return;
     }
     
-    // Here you would typically send the notes to the server
-    // For now, just show a success message
-    showAlert('Notes saved successfully!', 'success');
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                     document.querySelector('meta[name=csrf-token]')?.getAttribute('content');
     
-    // Close the modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('notesModal'));
-    modal.hide();
+    // Show loading state
+    const saveBtn = document.querySelector('#notesModal .btn-primary');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+    saveBtn.disabled = true;
     
-    // Clear the textarea
-    document.getElementById('orderNotes').value = '';
+    // Prepare note data
+    const noteData = {
+        notes: notes,
+        note_type: noteType,
+        order_number: '{{ order.order_number }}'
+    };
+    
+    // Simulate API call (replace with actual endpoint)
+    setTimeout(() => {
+        // Success response simulation
+        const typeLabels = {
+            internal: 'Internal Note',
+            customer: 'Customer Message', 
+            delivery: 'Delivery Instructions'
+        };
+        
+        showAlert(`${typeLabels[noteType]} saved successfully!`, 'success');
+        
+        // Close the modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('notesModal'));
+        modal.hide();
+        
+        // Clear the form
+        document.getElementById('orderNotes').value = '';
+        document.getElementById('internal').checked = true;
+        document.getElementById('notePreview').style.display = 'none';
+        
+        // Restore button state
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+        
+        // If customer message, show additional info
+        if (noteType === 'customer') {
+            setTimeout(() => {
+                showAlert('Customer will be notified via SMS', 'info');
+            }, 1000);
+        }
+        
+    }, 1000);
+    
+    /* TODO: Replace simulation with actual API call:
+    fetch('/api/orders/notes/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify(noteData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            // Handle success...
+        } else {
+            showAlert(data.message || 'Failed to save notes.', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('An error occurred while saving notes.', 'danger');
+    })
+    .finally(() => {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    });
+    */
 }
+
+<!-- Cancel Order Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-warning bg-opacity-10 border-0">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="fas fa-exclamation-triangle text-warning me-2"></i>Cancel Order</h5>
+                    <small class="text-muted">This action cannot be undone</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="cancelForm" method="post" action="{% url 'stores:cancel_order' order.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Cancellation Reason</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="">Select reason...</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="customer_request">Customer Request</option>
+                            <option value="store_issue">Store Issue</option>
+                            <option value="payment_issue">Payment Issue</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Additional Details</label>
+                        <textarea name="details" class="form-control" rows="3" placeholder="Provide additional details (optional)"></textarea>
+                    </div>
+                    <div class="alert alert-warning d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>Note:</strong> 
+                            {% if order.payment_method == 'prepaid' %}
+                            This prepaid order will be automatically refunded after cancellation.
+                            {% else %}
+                            This cash-on-delivery order can be cancelled without refund processing.
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep Order</button>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="fas fa-times-circle me-2"></i>Cancel Order
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Refund Modal -->
+<div class="modal fade" id="refundModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-danger bg-opacity-10 border-0">
+                <div>
+                    <h5 class="modal-title mb-0"><i class="fas fa-money-bill-wave text-danger me-2"></i>Process Refund</h5>
+                    <small class="text-muted">Refund for delivered order</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form id="refundForm" method="post" action="{% url 'stores:process_refund' order.id %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Reason</label>
+                        <select name="reason" class="form-select" required>
+                            <option value="">Select reason...</option>
+                            <option value="quality_issue">Quality Issue</option>
+                            <option value="wrong_item">Wrong Item Delivered</option>
+                            <option value="customer_dissatisfied">Customer Dissatisfied</option>
+                            <option value="damaged_product">Damaged Product</option>
+                            <option value="store_error">Store Error</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Amount</label>
+                        <div class="input-group">
+                            <span class="input-group-text">₹</span>
+                            <input type="number" name="amount" class="form-control" step="0.01" max="{{ order.total_amount }}" value="{{ order.total_amount }}" required>
+                        </div>
+                        <small class="text-muted">Maximum refund: ₹{{ order.total_amount }}</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Refund Details</label>
+                        <textarea name="details" class="form-control" rows="3" placeholder="Provide details about the refund reason" required></textarea>
+                    </div>
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <div>
+                            <strong>Refund Processing:</strong> The refund will be processed to the original payment method within 3-5 business days.
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-money-bill-wave me-2"></i>Process Refund
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 </script>
 {% endblock %}

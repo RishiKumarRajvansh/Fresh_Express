@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Staff Login{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center align-items-center min-vh-100">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white text-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-user-tie"></i> Staff Login
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    {% if first_login %}
+                        <!-- First Time Login - Set Password -->
+                        <div class="alert alert-info" role="alert">
+                            <h6 class="alert-heading">
+                                <i class="fas fa-info-circle"></i> Welcome {{ staff_name }}!
+                            </h6>
+                            <p class="mb-0">This is your first login. Please set up your password to continue.</p>
+                        </div>
+                        
+                        <form method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            <input type="hidden" name="staff_id" value="{{ staff_id }}">
+                            <input type="hidden" name="email" value="{{ email }}">
+                            
+                            <div class="form-group mb-3">
+                                <label class="form-label">Staff ID</label>
+                                <input type="text" class="form-control" value="{{ staff_id }}" disabled>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" value="{{ email }}" disabled>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label for="new_password" class="form-label">New Password</label>
+                                <input type="password" class="form-control" name="new_password" id="new_password" 
+                                       required minlength="6" placeholder="Enter your new password">
+                                <div class="invalid-feedback">
+                                    Password must be at least 6 characters long.
+                                </div>
+                            </div>
+                            
+                            <div class="form-group mb-4">
+                                <label for="confirm_password" class="form-label">Confirm Password</label>
+                                <input type="password" class="form-control" name="confirm_password" id="confirm_password" 
+                                       required minlength="6" placeholder="Confirm your new password">
+                                <div class="invalid-feedback">
+                                    Please confirm your password.
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-key"></i> Set Password & Login
+                            </button>
+                        </form>
+                    
+                    {% else %}
+                        <!-- Normal Login Form -->
+                        <form method="post" class="needs-validation" novalidate>
+                            {% csrf_token %}
+                            
+                            <div class="form-group mb-3">
+                                <label for="staff_id" class="form-label">
+                                    <i class="fas fa-id-badge"></i> Staff ID
+                                </label>
+                                <input type="text" class="form-control" name="staff_id" id="staff_id" 
+                                       required placeholder="Enter your Staff ID (e.g., ST001)"
+                                       value="{{ request.POST.staff_id|default:'' }}">
+                                <div class="invalid-feedback">
+                                    Please enter your Staff ID.
+                                </div>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label for="email" class="form-label">
+                                    <i class="fas fa-envelope"></i> Email Address
+                                </label>
+                                <input type="email" class="form-control" name="email" id="email" 
+                                       required placeholder="Enter your email address"
+                                       value="{{ request.POST.email|default:'' }}">
+                                <div class="invalid-feedback">
+                                    Please enter a valid email address.
+                                </div>
+                            </div>
+                            
+                            <div class="form-group mb-4">
+                                <label for="password" class="form-label">
+                                    <i class="fas fa-lock"></i> Password
+                                </label>
+                                <input type="password" class="form-control" name="password" id="password" 
+                                       placeholder="Enter your password">
+                                <small class="form-text text-muted">
+                                    First time? Leave password blank and we'll help you set it up.
+                                </small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-sign-in-alt"></i> Login
+                            </button>
+                        </form>
+                    {% endif %}
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <small class="text-muted">
+                            Need help? Contact your store manager.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.min-vh-100 {
+    min-height: 100vh;
+}
+</style>
+
+<script>
+// Password confirmation validation
+document.addEventListener('DOMContentLoaded', function() {
+    const newPassword = document.getElementById('new_password');
+    const confirmPassword = document.getElementById('confirm_password');
+    
+    if (newPassword && confirmPassword) {
+        function validatePasswords() {
+            if (newPassword.value !== confirmPassword.value) {
+                confirmPassword.setCustomValidity('Passwords do not match');
+            } else {
+                confirmPassword.setCustomValidity('');
+            }
+        }
+        
+        newPassword.addEventListener('input', validatePasswords);
+        confirmPassword.addEventListener('input', validatePasswords);
+    }
+    
+    // Bootstrap validation
+    const forms = document.querySelectorAll('.needs-validation');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        });
+    });
+});
+</script>
+{% endblock %}
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 15px;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        font-size: 16px;
+        transition: border-color 0.3s ease;
+        box-sizing: border-box;
+    }
+    
+    .form-control:focus {
+        border-color: #D32F2F;
+        outline: none;
+    }
+    
+    .btn-login {
+        width: 100%;
+        padding: 15px;
+        background: linear-gradient(135deg, #D32F2F, #8B0000);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+    
+    .btn-login:hover {
+        transform: translateY(-2px);
+    }
+    
+    .login-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 4px solid #D32F2F;
+    }
+    
+    .login-info h6 {
+        margin: 0 0 10px 0;
+        color: #D32F2F;
+        font-weight: 600;
+    }
+    
+    .login-info ul {
+        margin: 0;
+        padding-left: 20px;
+        font-size: 14px;
+        color: #666;
+    }
+    
+    .login-links {
+        text-align: center;
+        margin-top: 20px;
+    }
+    
+    .login-links a {
+        color: #D32F2F;
+        text-decoration: none;
+        font-size: 14px;
+    }
+    
+    .login-links a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <h2><i class="fas fa-user-tie"></i> Staff Login</h2>
+            <p>Login to your store account</p>
+        </div>
+        
+        <div class="login-info">
+            <h6><i class="fas fa-info-circle"></i> How to Login:</h6>
+            <ul>
+                <li>Enter your Store ID (provided by store manager)</li>
+                <li>Enter your Staff ID (e.g., ST001001)</li>
+                <li>Enter your password</li>
+            </ul>
+        </div>
+        
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="{{ form.store_id.id_for_label }}">Store ID</label>
+                {{ form.store_id }}
+                {% if form.store_id.errors %}
+                    <div class="text-danger mt-1">{{ form.store_id.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.staff_id.id_for_label }}">Staff ID</label>
+                {{ form.staff_id }}
+                {% if form.staff_id.errors %}
+                    <div class="text-danger mt-1">{{ form.staff_id.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="{{ form.password.id_for_label }}">Password</label>
+                {{ form.password }}
+                {% if form.password.errors %}
+                    <div class="text-danger mt-1">{{ form.password.errors.0 }}</div>
+                {% endif %}
+            </div>
+            
+            <button type="submit" class="btn-login">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+        </form>
+        
+        <div class="login-links">
+            <a href="{% url 'accounts:email_login' %}?type=store">Store Owner Login</a> |
+            <a href="{% url 'accounts:email_login' %}?type=delivery">Delivery Agent Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

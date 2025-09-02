@@ -1,9 +1,10 @@
-{% extends 'base_mobile.html' %}
+{% extends 'stores/base.html' %}
 {% load static %}
 
 {% block title %}Store Dashboard - {{ store.name }}{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
 <style>
 :root {
     --store-primary: #2C5F2D;
@@ -400,7 +401,7 @@
 </style>
 {% endblock %}
 
-{% block content %}
+{% block store_content %}
 <div class="container-fluid py-3">
     <!-- Dashboard Header -->
     <div class="dashboard-header">
@@ -473,7 +474,7 @@
 
     <!-- Quick Actions -->
     <div class="quick-actions">
-        <a href="{% url 'stores:orders_management' %}" class="quick-action">
+        <a href="{% url 'stores:orders' %}" class="quick-action">
             <div class="action-icon">
                 <i class="fas fa-list-alt"></i>
                 {% if stats.pending_orders > 0 %}
@@ -509,6 +510,19 @@
             </div>
         </a>
 
+        <a href="{% url 'stores:staff_list' %}" class="quick-action">
+            <div class="action-icon">
+                <i class="fas fa-users"></i>
+                {% if stats.staff_count %}
+                    <span class="info-badge">{{ stats.staff_count }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <div class="fw-bold">Staff Management</div>
+                <small class="text-muted">Manage store staff</small>
+            </div>
+        </a>
+
         <a href="{% url 'stores:manage_zip_coverage' %}" class="quick-action">
             <div class="action-icon">
                 <i class="fas fa-map-marker-alt"></i>
@@ -539,7 +553,7 @@
                         <i class="fas fa-exclamation-circle text-danger"></i>
                         Pending Orders (Immediate Action Required)
                     </div>
-                    <a href="{% url 'stores:orders_management' %}?status=pending" class="btn btn-sm btn-outline-primary">
+                    <a href="{% url 'stores:orders' %}?status=pending" class="btn btn-sm btn-outline-primary">
                         View All
                     </a>
                 </div>
@@ -564,13 +578,13 @@
                                 </div>
                             </div>
                             <div class="order-actions">
-                                <button class="btn-action success" onclick="updateOrderStatus({{ order.id }}, 'confirmed')">
+                                <button class="btn-action success" onclick="updateOrderStatus('{{ order.order_number }}', 'confirmed')">
                                     <i class="fas fa-check me-1"></i>Confirm
                                 </button>
-                                <a href="{% url 'stores:order_detail' order.id %}" class="btn-action primary">
+                                <a href="{% url 'stores:order_detail' order.order_number %}" class="btn-action primary">
                                     <i class="fas fa-eye me-1"></i>Details
                                 </a>
-                                <button class="btn-action warning" onclick="updateOrderStatus({{ order.id }}, 'cancelled')">
+                                <button class="btn-action warning" onclick="updateOrderStatus('{{ order.order_number }}', 'cancelled')">
                                     <i class="fas fa-times me-1"></i>Cancel
                                 </button>
                             </div>
@@ -746,7 +760,7 @@ function showNewOrderNotification(count) {
     
     // Make notification clickable to go to orders
     notification.addEventListener('click', () => {
-        window.location.href = '{% url "stores:orders_management" %}?status=pending';
+        window.location.href = '{% url "stores:orders" %}?status=pending';
     });
 }
 
@@ -757,7 +771,7 @@ function playNotificationSound() {
     audio.play().catch(e => console.log('Audio play failed:', e));
 }
 
-function updateOrderStatus(orderId, status) {
+function updateOrderStatus(orderNumber, status) {
     if (confirm(`Are you sure you want to ${status} this order?`)) {
         // Helper to read cookie
         function getCookie(name) {
@@ -778,14 +792,16 @@ function updateOrderStatus(orderId, status) {
         const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
         const csrfToken = (csrfEl && csrfEl.value) || getCookie('csrftoken') || '{{ csrf_token }}';
 
-        fetch('{% url "stores:update_order_status" %}', {
+        fetch(`{% url "stores:update_order_status" "PLACEHOLDER" %}`.replace('PLACEHOLDER', orderNumber), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken
             },
-            body: `order_id=${orderId}&status=${status}`
+            body: JSON.stringify({
+                status: status
+            })
         })
         .then(response => response.json())
         .then(data => {

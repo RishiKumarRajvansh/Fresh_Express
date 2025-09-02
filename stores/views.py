@@ -7,7 +7,7 @@ from django.urls import reverse_lazy
 from django.http import JsonResponse
 from django.utils import timezone
 from django.db.models import Q, Count
-from .models import Store, StoreClosureRequest
+from .models import Store, StoreClosureRequest, StoreStaff
 from catalog.models import StoreProduct
 from orders.models import Order
 from delivery.models import DeliveryAgent
@@ -78,6 +78,7 @@ class StoreDashboardView(StoreRequiredMixin, TemplateView):
                     stock_quantity__lt=10
                 ).count(),
                 'available_agents': available_agents_count,
+                'staff_count': StoreStaff.objects.filter(store=store, is_active=True).count(),
             }
             
             # Store status
@@ -271,7 +272,7 @@ def store_orders(request):
             store = Store.objects.get(owner=request.user)
         elif request.user.user_type == 'store_staff':
             # Store staff should have access to their assigned store
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
         else:
             return render(request, 'stores/access_denied.html')
     except Store.DoesNotExist:
@@ -303,7 +304,7 @@ def order_detail(request, order_id):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         elif request.user.user_type == 'store_staff':
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
         else:
             return render(request, 'stores/access_denied.html')
         
@@ -311,9 +312,24 @@ def order_detail(request, order_id):
     except Store.DoesNotExist:
         return render(request, 'stores/access_denied.html')
     
+    # Get staff assignment if exists
+    from .models import StaffOrderAssignment
+    try:
+        staff_assignment = StaffOrderAssignment.objects.get(order=order)
+        order.staff_assignment = staff_assignment
+    except StaffOrderAssignment.DoesNotExist:
+        order.staff_assignment = None
+    
+    # Get available staff for assignment
+    available_staff = StoreStaff.objects.filter(
+        store=store,
+        is_active=True
+    ).select_related('user')
+    
     context = {
         'store': store,
         'order': order,
+        'available_staff': available_staff,
     }
     
     return render(request, 'stores/order_detail.html', context)
@@ -326,7 +342,7 @@ def store_inventory(request):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         else:
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
     except Store.DoesNotExist:
         return redirect('core:home')
     
@@ -450,7 +466,7 @@ def edit_store_product(request, product_id):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         else:
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
     except Store.DoesNotExist:
         return redirect('core:home')
     
@@ -497,7 +513,7 @@ def delete_store_product(request, product_id):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         else:
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
     except Store.DoesNotExist:
         return redirect('core:home')
     
@@ -524,7 +540,7 @@ def delivery_agents(request):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         else:
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
     except Store.DoesNotExist:
         return redirect('core:home')
     
@@ -571,7 +587,7 @@ def new_orders_count(request):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         else:
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
         
         pending_orders = Order.objects.filter(
             store=store,
@@ -610,7 +626,7 @@ def update_order_status(request):
             if request.user.user_type == 'store_owner':
                 store = Store.objects.get(owner=request.user)
             else:
-                store = Store.objects.get(staff=request.user)
+                store = Store.objects.get(storestaff__user=request.user)
             
             order_id = request.POST.get('order_id')
             status = request.POST.get('status')
@@ -664,7 +680,7 @@ def toggle_store_status(request):
             if request.user.user_type == 'store_owner':
                 store = Store.objects.get(owner=request.user)
             else:
-                store = Store.objects.get(staff=request.user)
+                store = Store.objects.get(storestaff__user=request.user)
             
             # Toggle store status
             if store.status == 'open':
@@ -709,7 +725,7 @@ def manage_zip_coverage(request):
         if request.user.user_type == 'store_owner':
             store = Store.objects.get(owner=request.user)
         else:
-            store = Store.objects.get(staff=request.user)
+            store = Store.objects.get(storestaff__user=request.user)
     except Store.DoesNotExist:
         return redirect('core:home')
     
@@ -738,3 +754,114 @@ def agent_zip_coverage(request):
     """View for delivery agents to select ZIP areas they can serve - MOVED TO DELIVERY APP"""
     # This function has been moved to delivery/views.py
     return redirect('delivery:agent_zip_coverage')
+
+
+@store_required
+def cancel_order(request, order_id):
+    """Cancel an order with reason and automatic refund for prepaid orders"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Verify store has permission to cancel this order
+    user_stores = Store.objects.filter(
+        Q(owner=request.user) | Q(staff_members=request.user)
+    ).values_list('id', flat=True)
+    
+    if order.store.id not in user_stores:
+        messages.error(request, 'You do not have permission to cancel this order.')
+        return redirect('stores:order_detail', order_number=order.order_number)
+    
+    if request.method == 'POST':
+        reason = request.POST.get('reason')
+        details = request.POST.get('details', '')
+        
+        try:
+            # Use the order's cancel method with user parameter
+            success, message = order.cancel_order(request.user, reason, details)
+            
+            if success:
+                messages.success(request, f'Order cancelled successfully. {message}')
+            else:
+                messages.error(request, f'Failed to cancel order: {message}')
+                
+        except Exception as e:
+            messages.error(request, f'Error cancelling order: {str(e)}')
+    
+    return redirect('stores:order_detail', order_number=order.order_number)
+
+
+@store_required 
+def process_refund(request, order_id):
+    """Process refund for delivered order"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Verify store has permission to refund this order
+    user_stores = Store.objects.filter(
+        Q(owner=request.user) | Q(staff_members=request.user)
+    ).values_list('id', flat=True)
+    
+    if order.store.id not in user_stores:
+        messages.error(request, 'You do not have permission to process refund for this order.')
+        return redirect('stores:order_detail', order_number=order.order_number)
+    
+    if request.method == 'POST':
+        reason = request.POST.get('reason')
+        amount = request.POST.get('amount')
+        details = request.POST.get('details', '')
+        
+        try:
+            # Use the order's refund method with user parameter
+            success, message = order.initiate_refund(request.user, float(amount), reason, details)
+            
+            if success:
+                messages.success(request, f'Refund processed successfully. {message}')
+            else:
+                messages.error(request, f'Failed to process refund: {message}')
+                
+        except ValueError:
+            messages.error(request, 'Invalid refund amount.')
+        except Exception as e:
+            messages.error(request, f'Error processing refund: {str(e)}')
+    
+    return redirect('stores:order_detail', order_number=order.order_number)
+
+
+@store_required
+def add_order_note(request, order_id):
+    """Add note to order"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Verify store has permission to add notes to this order
+    user_stores = Store.objects.filter(
+        Q(owner=request.user) | Q(staff_members=request.user)
+    ).values_list('id', flat=True)
+    
+    if order.store.id not in user_stores:
+        messages.error(request, 'You do not have permission to add notes to this order.')
+        return redirect('stores:order_detail', order_number=order.order_number)
+    
+    if request.method == 'POST':
+        note_type = request.POST.get('note_type', 'general')
+        content = request.POST.get('content', '')
+        
+        if content.strip():
+            # For now, just add to order notes (can be enhanced with separate notes model)
+            if not order.notes:
+                order.notes = ""
+            
+            timestamp = timezone.now().strftime("%Y-%m-%d %H:%M")
+            note_prefix = {
+                'general': '📝 General',
+                'preparation': '👨‍🍳 Preparation', 
+                'delivery': '🚚 Delivery',
+                'customer_issue': '❗ Customer Issue'
+            }.get(note_type, '📝 Note')
+            
+            new_note = f"\n[{timestamp}] {note_prefix}: {content}"
+            order.notes += new_note
+            order.save()
+            
+            messages.success(request, f'{note_prefix} added successfully!')
+        else:
+            messages.error(request, 'Please provide note content.')
+    
+    return redirect('stores:order_detail', order_number=order.order_number)

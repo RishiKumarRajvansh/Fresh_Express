@@ -22,9 +22,12 @@
                             <small class="text-muted">Placed on {{ order.created_at|date:"F d, Y at g:i A" }}</small>
                         </div>
                         <div class="col-md-4 text-md-end">
-                            <span class="badge bg-{% if order.status == 'delivered' %}success{% elif order.status == 'cancelled' %}danger{% elif order.status == 'confirmed' %}primary{% else %}warning{% endif %} fs-6">
-                                {{ order.get_status_display }}
+                            <span class="badge bg-{% if order.status == 'delivered' %}success{% elif order.status == 'cancelled' %}danger{% elif order.status == 'confirmed' or order.status == 'preparing' %}primary{% elif order.status == 'packed' or order.status == 'ready_for_pickup' or order.status == 'handed_to_delivery' or order.status == 'out_for_delivery' %}info{% else %}warning{% endif %} fs-6">
+                                {{ order.get_customer_friendly_status }}
                             </span>
+                            <div class="mt-2">
+                                <small class="text-muted">{{ order.get_status_description }}</small>
+                            </div>
                             <div class="mt-2">
                                 <span class="badge bg-{% if order.payment_status == 'paid' %}success{% elif order.payment_status == 'failed' %}danger{% else %}warning{% endif %}">
                                     Payment: {{ order.get_payment_status_display }}

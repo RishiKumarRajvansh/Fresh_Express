@@ -3,6 +3,8 @@ from django.contrib.auth import views as auth_views
 from . import views
 from . import views_loyalty
 from . import views_auth
+from . import views_staff
+from . import staff_auth
 
 app_name = 'accounts'
 
@@ -17,6 +19,10 @@ urlpatterns = [
     
     # Email-based Authentication (Admin, Store, Delivery)
     path('email-login/', views_auth.EmailLoginView.as_view(), name='email_login'),
+    
+    # Staff Login (Staff ID + Email + Password Setup)
+    path('staff-login/', staff_auth.StaffLoginView.as_view(), name='staff_login'),
+    path('staff-password-change/', staff_auth.StaffPasswordChangeView.as_view(), name='staff_password_change'),
     
     # Business User Registration
     path('business-register/', views_auth.BusinessRegistrationView.as_view(), name='business_register'),

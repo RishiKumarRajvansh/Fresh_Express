@@ -124,33 +124,16 @@ def add_to_cart_view(request):
             'message': 'Method not allowed'
         }, status=405)
     
+    # Handle both JSON and form data
+    content_type = (request.content_type or '')
+    
     try:
-        # Handle both JSON and form data. Accept content types like
-        # 'application/json; charset=UTF-8' by checking startswith.
-        content_type = (request.content_type or '')
-        logger = logging.getLogger('django.request')
-        try:
-            if content_type.startswith('application/json'):
-                raw_body = request.body.decode('utf-8') if request.body else ''
-                data = json.loads(raw_body) if raw_body else {}
-            else:
-                data = request.POST
-        finally:
-            # Log content type and parsed data for debugging
-            try:
-                    # Log headers, cookies and small preview of body to help debug AJAX issues
-                    cookie_keys = list(request.COOKIES.keys()) if hasattr(request, 'COOKIES') else []
-                    logger.debug(f"add_to_cart_view: content_type={content_type}, cookie_keys={cookie_keys}, parsed_data={data}")
-                    logger.debug(f"add_to_cart_view: user_authenticated={getattr(request.user, 'is_authenticated', False)}")
-                    # Also log a short preview of raw body for debugging
-                    try:
-                        preview = (raw_body[:1000] + '...') if raw_body and len(raw_body) > 1000 else (raw_body or '')
-                        logger.debug(f"add_to_cart_view: raw_body_preview={preview}")
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            
+        if content_type.startswith('application/json'):
+            raw_body = request.body.decode('utf-8') if request.body else ''
+            data = json.loads(raw_body) if raw_body else {}
+        else:
+            data = request.POST
+                
         store_product_id = data.get('store_product_id')
         quantity = int(data.get('quantity', 1))
                 
@@ -167,19 +150,10 @@ def add_to_cart_view(request):
         store_product = get_object_or_404(StoreProduct, id=store_product_id)
         
         if not request.user.is_authenticated:
-            # Provide helpful debug info to the frontend so developer can see whether
-            # the session cookie was received by the server. Do NOT include cookie values.
-            debug_info = {
+            return JsonResponse({
                 'success': False,
                 'message': 'Please login to add items to cart',
-                'debug': {
-                    'user_is_authenticated': False,
-                    'cookie_keys': list(request.COOKIES.keys()) if hasattr(request, 'COOKIES') else [],
-                    'content_type': content_type,
-                    'parsed_data_keys': list(data.keys()) if hasattr(data, 'keys') else []
-                }
-            }
-            return JsonResponse(debug_info)
+            })
         
         # Check if product is available
         if not store_product.is_available:

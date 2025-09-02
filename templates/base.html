@@ -126,21 +126,28 @@
                             </a></li>
                             {% endif %}
                             
-                            {% if user.user_type == 'store_owner' or user.user_type == 'store_staff' %}
-                            <li><hr class="dropdown-divider"></li>
-                            <li><h6 class="dropdown-header">Store Management</h6></li>
-                            <li><a class="dropdown-item" href="{% url 'stores:dashboard' %}">
-                                <i class="fas fa-store me-2"></i>Store Dashboard
-                            </a></li>
-                            <li><a class="dropdown-item" href="{% url 'stores:orders_management' %}">
-                                <i class="fas fa-list-alt me-2"></i>Manage Orders
-                            </a></li>
-                            <li><a class="dropdown-item" href="{% url 'stores:inventory_management' %}">
-                                <i class="fas fa-boxes me-2"></i>Inventory
-                            </a></li>
-                            {% endif %}
-                            
-                            {% if user.user_type == 'delivery_agent' %}
+            {% if user.user_type == 'store_owner' %}
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Store Management</h6></li>
+            <li><a class="dropdown-item" href="{% url 'stores:dashboard' %}">
+                <i class="fas fa-store me-2"></i>Store Dashboard
+            </a></li>
+            <li><a class="dropdown-item" href="{% url 'stores:orders' %}">
+                <i class="fas fa-list-alt me-2"></i>Manage Orders
+            </a></li>
+            <li><a class="dropdown-item" href="{% url 'stores:inventory_management' %}">
+                <i class="fas fa-boxes me-2"></i>Inventory
+            </a></li>
+            {% elif user.user_type == 'store_staff' %}
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Staff Menu</h6></li>
+            <li><a class="dropdown-item" href="{% url 'stores:staff_dashboard' %}">
+                <i class="fas fa-tachometer-alt me-2"></i>Staff Dashboard
+            </a></li>
+            <li><a class="dropdown-item" href="{% url 'stores:staff_orders' %}">
+                <i class="fas fa-tasks me-2"></i>My Assigned Orders
+            </a></li>
+            {% endif %}                            {% if user.user_type == 'delivery_agent' %}
                             <li><hr class="dropdown-divider"></li>
                             <li><h6 class="dropdown-header">Delivery</h6></li>
                             <li><a class="dropdown-item" href="{% url 'delivery:agent_profile_new' %}">
@@ -175,10 +182,6 @@
                                         <i class="fas fa-sign-out-alt me-2"></i>Logout
                                     </button>
                                 </form>
-                                {# Fallback GET link in case JS or form submission is blocked #}
-                                <a href="{% url 'accounts:logout' %}" class="dropdown-item text-danger" id="logout-get-fallback">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Logout (link)
-                                </a>
                             </li>
                         </ul>
                     </li>

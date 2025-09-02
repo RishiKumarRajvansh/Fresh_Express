@@ -241,12 +241,20 @@
                                 <i class="fas fa-tachometer-alt me-2"></i>Admin Dashboard
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
-                            {% elif user.user_type == 'store_owner' or user.user_type == 'store_staff' %}
+                            {% elif user.user_type == 'store_owner' %}
                             <li><a class="dropdown-item" href="{% url 'stores:dashboard' %}">
                                 <i class="fas fa-store me-2"></i>Store Dashboard
                             </a></li>
                             <li><a class="dropdown-item" href="{% url 'stores:orders_management' %}">
                                 <i class="fas fa-shopping-bag me-2"></i>Manage Orders
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% elif user.user_type == 'store_staff' %}
+                            <li><a class="dropdown-item" href="{% url 'stores:staff_dashboard' %}">
+                                <i class="fas fa-tachometer-alt me-2"></i>Staff Dashboard
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'stores:staff_orders' %}">
+                                <i class="fas fa-tasks me-2"></i>My Assigned Orders
                             </a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% elif user.user_type == 'delivery_agent' %}
@@ -296,10 +304,6 @@
                                         <i class="fas fa-sign-out-alt me-2"></i>Logout
                                     </button>
                                 </form>
-                                {# Fallback GET link in case JS or form submission is blocked - hidden by default #}
-                                <a href="{% url 'accounts:logout' %}" class="dropdown-item text-danger d-none" id="logout-get-fallback-mobile">
-                                    <i class="fas fa-sign-out-alt me-2"></i>Logout (fallback)
-                                </a>
                             </li>
                         </ul>
                     </li>

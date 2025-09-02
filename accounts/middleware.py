@@ -48,7 +48,7 @@ class UserTypeAccessMiddleware:
                 'redirect_url': '/admin/login/',
             },
             'store': {
-                'allowed_paths': ['/stores/', '/dashboards/store/', '/core/store/'],
+                'allowed_paths': ['/stores/', '/dashboards/store/', '/core/store/', '/delivery/store/'],
                 'allowed_users': ['store_owner', 'store_staff'],
                 'redirect_url': 'accounts:email_login',
             },
@@ -68,7 +68,7 @@ class UserTypeAccessMiddleware:
         for rule_name, rule_data in access_rules.items():
             # Check if current path matches this rule
             if any(path.startswith(allowed_path) for allowed_path in rule_data['allowed_paths']):
-                # If user type is not allowed for this path
+                # If user type is not allowed for this path, redirect them
                 if user_type not in rule_data['allowed_users']:
                     # Special handling for admin paths
                     if rule_name == 'admin':
@@ -80,8 +80,11 @@ class UserTypeAccessMiddleware:
                         if user_type == 'customer':
                             logger.info(f"UserTypeAccessMiddleware: redirecting customer user={getattr(request.user,'username',None)} path={path} -> core:home")
                             return redirect('core:home')
+                        elif user_type == 'delivery_agent':
+                            logger.info(f"UserTypeAccessMiddleware: redirecting delivery agent user={getattr(request.user,'username',None)} path={path} -> delivery:agent_dashboard")
+                            return redirect('delivery:agent_dashboard')
                         else:
-                            logger.info(f"UserTypeAccessMiddleware: redirecting non-customer user={getattr(request.user,'username',None)} path={path} -> accounts:email_login")
+                            logger.info(f"UserTypeAccessMiddleware: redirecting user={getattr(request.user,'username',None)} path={path} -> accounts:email_login")
                             return redirect('accounts:email_login')
                     
                     # Special handling for delivery paths  
@@ -89,8 +92,11 @@ class UserTypeAccessMiddleware:
                         if user_type == 'customer':
                             logger.info(f"UserTypeAccessMiddleware: redirecting customer user={getattr(request.user,'username',None)} path={path} -> core:home")
                             return redirect('core:home')
+                        elif user_type in ['store_owner', 'store_staff']:
+                            logger.info(f"UserTypeAccessMiddleware: redirecting store user={getattr(request.user,'username',None)} path={path} -> stores:dashboard")
+                            return redirect('stores:dashboard')
                         else:
-                            logger.info(f"UserTypeAccessMiddleware: redirecting non-customer user={getattr(request.user,'username',None)} path={path} -> accounts:email_login")
+                            logger.info(f"UserTypeAccessMiddleware: redirecting other user={getattr(request.user,'username',None)} path={path} -> accounts:email_login")
                             return redirect('accounts:email_login')
                     
                     # For customer paths, redirect non-customers appropriately

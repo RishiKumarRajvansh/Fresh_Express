@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from .production_views import *
 from .workflow_views import *
+from . import otp_views
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
@@ -133,6 +134,22 @@ urlpatterns = [
     path('confirm-delivery/', confirm_delivery, name='confirm_delivery'),
     path('store/confirm-handover/', store_confirm_handover, name='store_confirm_handover'),
     path('workflow-status/<str:order_number>/', order_workflow_status, name='workflow_status'),
+    
+    # OTP Verification Workflow
+    path('handover/<str:order_id>/', views.handover_order, name='handover_order'),
+    path('confirm-delivery-otp/<str:order_id>/', views.confirm_delivery_otp, name='confirm_delivery_otp'),
+    path('agent/handover/<str:order_id>/', views.AgentOrderHandoverView.as_view(), name='agent_handover'),
+    path('agent/deliver/<str:order_id>/', views.AgentDeliveryConfirmView.as_view(), name='agent_delivery_confirm'),
+    path('store/assign-agent/<str:order_id>/', views.ManualAgentAssignmentView.as_view(), name='manual_assignment'),
+    path('test/assign-agent/<str:order_id>/', views.TestAssignmentView.as_view(), name='test_assignment'),
+    
+    # Enhanced OTP Workflow
+    path('otp/store-handover/<str:order_id>/', otp_views.StoreHandoverInitiateView.as_view(), name='store_handover_initiate'),
+    path('otp/agent-handover/<str:order_id>/', otp_views.AgentHandoverConfirmView.as_view(), name='agent_handover_confirm'),
+    path('otp/customer-delivery-initiate/<str:order_id>/', otp_views.CustomerDeliveryInitiateView.as_view(), name='customer_delivery_initiate'),
+    path('otp/customer-delivery-confirm/<str:order_id>/', otp_views.CustomerDeliveryConfirmView.as_view(), name='customer_delivery_confirm'),
+    path('generate-otp/<str:order_id>/', otp_views.generate_handover_otp, name='generate_otp'),
+    path('verify-otp/<str:order_id>/', otp_views.verify_handover_otp, name='verify_otp'),
     
     # Order Tracking (for customers)
     path('track/<str:order_number>/', views.TrackOrderView.as_view(), name='track_order'),

@@ -17,9 +17,9 @@ class DeliveryAssignmentService:
     """Service to handle automatic delivery assignments"""
     
     @staticmethod
-    def assign_order_to_agent(order):
+    def assign_order_to_agent(order, manual_agent_id=None):
         """
-        Automatically assign an order to the best available delivery agent
+        Assign an order to a delivery agent (auto or manual)
         """
         try:
             with transaction.atomic():
@@ -27,54 +27,139 @@ class DeliveryAssignmentService:
                 if hasattr(order, 'delivery_assignment'):
                     return order.delivery_assignment
                 
-                # Find available agents for the store
-                available_agents = DeliveryAgent.objects.filter(
-                    store=order.store,
-                    is_available=True,
-                    status='active'
-                ).annotate(
-                    current_orders=Count(
-                        'assigned_orders',
-                        filter=Q(assigned_orders__status__in=['assigned', 'accepted', 'picked_up'])
-                    )
-                ).filter(
-                    current_orders__lt=F('max_concurrent_orders')
-                ).order_by('current_orders', '?')  # Random selection among least busy
+                # Manual assignment by store manager
+                if manual_agent_id:
+                    try:
+                        selected_agent = DeliveryAgent.objects.get(
+                            id=manual_agent_id,
+                            store=order.store,
+                            status='active'
+                        )
+                    except DeliveryAgent.DoesNotExist:
+                        logger.error(f"Invalid agent ID {manual_agent_id} for order {order.order_number}")
+                        return None
+                else:
+                    # Automatic assignment - find best available agent
+                    selected_agent = DeliveryAssignmentService._find_best_available_agent(order)
                 
-                if not available_agents.exists():
+                if not selected_agent:
                     logger.warning(f"No available agents for order {order.order_number}")
                     return None
-                
-                # Select the best agent (least busy)
-                selected_agent = available_agents.first()
-                
-                # Estimate distance and time (simplified calculation)
-                estimated_distance = Decimal('5.0')  # Default 5km
-                estimated_time = 30  # Default 30 minutes
                 
                 # Create assignment
                 assignment = DeliveryAssignment.objects.create(
                     order=order,
                     agent=selected_agent,
                     status='assigned',
-                    estimated_distance_km=estimated_distance,
-                    estimated_time_minutes=estimated_time
+                    estimated_distance_km=DeliveryAssignmentService._calculate_distance(order, selected_agent),
+                    estimated_time_minutes=DeliveryAssignmentService._calculate_estimated_time(order)
                 )
                 
-                # Update order status
-                order.status = 'assigned_to_delivery'
-                order.save()
+                # Note: Don't update order status here to avoid circular calls
+                # The status will be updated by the calling service
                 
                 logger.info(f"Order {order.order_number} assigned to agent {selected_agent.user.get_full_name()}")
-                
-                # TODO: Send notification to agent
-                # self.notify_agent(selected_agent, assignment)
-                
                 return assignment
                 
         except Exception as e:
-            logger.error(f"Error assigning order {order.order_number}: {str(e)}")
+            logger.error(f"Failed to assign order {order.order_number}: {str(e)}")
             return None
+    
+    @staticmethod
+    def _find_best_available_agent(order):
+        """Find the best available delivery agent for an order"""
+        # Find available agents for the store
+        available_agents = DeliveryAgent.objects.filter(
+            store=order.store,
+            is_available=True,
+            status='active'
+        ).annotate(
+            current_orders=Count(
+                'assigned_orders',
+                filter=Q(assigned_orders__status__in=['assigned', 'accepted', 'picked_up', 'in_transit'])
+            )
+        ).filter(
+            current_orders__lt=F('max_concurrent_orders')
+        ).order_by('current_orders', '?')  # Random selection among least busy
+        
+        if not available_agents.exists():
+            return None
+            
+        # TODO: Add proximity-based selection using delivery address
+        # For now, return the least busy agent
+        return available_agents.first()
+    
+    @staticmethod
+    def _calculate_distance(order, agent):
+        """Calculate estimated distance between store and delivery address"""
+        # TODO: Implement real distance calculation using maps API
+        return Decimal('5.0')  # Default 5km
+    
+    @staticmethod  
+    def _calculate_estimated_time(order):
+        """Calculate estimated delivery time"""
+        # TODO: Consider traffic, distance, and order complexity
+        return 30  # Default 30 minutes
+    
+    @staticmethod
+    def handover_to_agent(order, handover_code):
+        """Handle store-to-agent handover with OTP verification"""
+        try:
+            assignment = order.delivery_assignment
+            
+            # Verify handover code
+            if order.handover_code != handover_code:
+                return False, "Invalid handover code"
+            
+            # Update assignment status
+            assignment.status = 'picked_up'
+            assignment.picked_up_at = timezone.now()
+            assignment.save()
+            
+            # Update order status
+            from orders.services import OrderStatusService
+            OrderStatusService.update_order_status(
+                order=order,
+                new_status='handed_to_delivery',
+                updated_by=assignment.agent.user,
+                notes="Order handed over to delivery agent"
+            )
+            
+            return True, "Order successfully handed over to delivery agent"
+            
+        except Exception as e:
+            logger.error(f"Error in handover for order {order.order_number}: {str(e)}")
+            return False, str(e)
+    
+    @staticmethod
+    def confirm_delivery(order, delivery_code):
+        """Handle final delivery confirmation with customer OTP"""
+        try:
+            assignment = order.delivery_assignment
+            
+            # Verify delivery confirmation code
+            if order.delivery_confirmation_code != delivery_code:
+                return False, "Invalid delivery code"
+            
+            # Update assignment status
+            assignment.status = 'delivered'
+            assignment.delivered_at = timezone.now()
+            assignment.save()
+            
+            # Update order status
+            from orders.services import OrderStatusService
+            OrderStatusService.update_order_status(
+                order=order,
+                new_status='delivered',
+                updated_by=assignment.agent.user,
+                notes="Order delivered to customer"
+            )
+            
+            return True, "Order successfully delivered"
+            
+        except Exception as e:
+            logger.error(f"Error in delivery confirmation for order {order.order_number}: {str(e)}")
+            return False, str(e)
     
     @staticmethod
     def reassign_order(assignment, reason=""):

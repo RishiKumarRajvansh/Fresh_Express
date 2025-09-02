@@ -196,8 +196,10 @@ class EmailLoginView(View):
             return redirect('/admin/login/')
             
         if request.user.is_authenticated and request.user.user_type != 'customer':
-            if user_type == 'store' and request.user.user_type in ['store_owner', 'store_staff']:
+            if user_type == 'store' and request.user.user_type == 'store_owner':
                 return redirect('stores:dashboard')
+            elif user_type == 'store' and request.user.user_type == 'store_staff':
+                return redirect('stores:staff_dashboard')
             elif user_type == 'delivery' and request.user.user_type == 'delivery_agent':
                 return redirect('delivery:agent_dashboard')
         
@@ -254,7 +256,10 @@ class EmailLoginView(View):
         
         # Redirect based on user type
         if user_type == 'store':
-            return redirect('stores:dashboard')
+            if user.user_type == 'store_owner':
+                return redirect('stores:dashboard')
+            elif user.user_type == 'store_staff':
+                return redirect('stores:staff_dashboard')
         elif user_type == 'delivery':
             return redirect('delivery:agent_dashboard')
         
@@ -518,7 +523,7 @@ class DeliveryAgentRegistrationView(View):
             return redirect('accounts:email_login')
             
         except Exception as e:
-            print(f"Delivery agent registration error: {e}")  # For debugging
+            messages.error(request, f'Error during delivery agent registration: {str(e)}')
             import traceback
             traceback.print_exc()
             context = {
@@ -544,7 +549,7 @@ class LogoutView(View):
         logger = logging.getLogger(__name__)
         user_type = getattr(request.user, 'user_type', 'customer') if request.user.is_authenticated else 'customer'
         username = getattr(request.user, 'username', None) if request.user.is_authenticated else None
-        # Log the logout request and session state for debugging
+        # Process logout request
         session_key_before = request.session.session_key
         logger.info(f"Logout requested by user={username} type={user_type} method={request.method} session_key_before={session_key_before} cookies={request.COOKIES.keys()}")
 

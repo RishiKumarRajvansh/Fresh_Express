@@ -3,6 +3,7 @@ from django.shortcuts import redirect
 from . import views
 from . import views_bulk_import
 from . import views_additional
+from . import staff_views
 from .order_management_views import (
     StoreOrderDashboardView, StoreOrderListView, StoreOrderDetailView,
     StoreOrderStatusUpdateView, StoreBulkOrderActionsView, store_order_analytics_api
@@ -19,20 +20,41 @@ urlpatterns = [
     
     # Enhanced Order Management System - Primary Routes
     path('orders/', StoreOrderListView.as_view(), name='orders'),
-    path('orders/dashboard/', StoreOrderDashboardView.as_view(), name='orders_dashboard'),
     path('orders/list/', StoreOrderListView.as_view(), name='orders_list'),
+    path('orders/management/', StoreOrderListView.as_view(), name='orders_management'),  # Fix for template references
+    path('orders/dashboard/', StoreOrderDashboardView.as_view(), name='orders_dashboard'),
     path('orders/<str:order_number>/', StoreOrderDetailView.as_view(), name='order_detail'),
     path('api/orders/update-status/<str:order_number>/', StoreOrderStatusUpdateView.as_view(), name='update_order_status'),
     path('api/orders/bulk-actions/', StoreBulkOrderActionsView.as_view(), name='bulk_order_actions'),
     path('api/orders/analytics/', store_order_analytics_api, name='order_analytics'),
+    path('orders/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
+    path('orders/<int:order_id>/refund/', views.process_refund, name='process_refund'),
+    path('orders/<int:order_id>/notes/', views.add_order_note, name='add_order_note'),
     
-    # Legacy order management (kept for backward compatibility)
-    path('orders/legacy/', views.store_orders, name='orders_management'),
+
     path('orders/legacy/<int:order_id>/', views.order_detail, name='legacy_order_detail'),
     path('inventory/', views.store_inventory, name='inventory_management'),
     path('inventory/edit/<int:product_id>/', views.edit_store_product, name='edit_product'),
     path('inventory/delete/<int:product_id>/', views.delete_store_product, name='delete_product'),
     path('agents/', views.delivery_agents, name='delivery_agents'),
+    
+    # Staff Management System
+    path('staff/', staff_views.StaffManagementView.as_view(), name='staff_list'),
+    path('staff/create/', staff_views.StaffCreateView.as_view(), name='staff_create'),
+    path('staff/<int:pk>/', staff_views.StaffDetailView.as_view(), name='staff_detail'),
+    path('staff/<int:pk>/delete/', staff_views.StaffDeleteView.as_view(), name='staff_delete'),
+    
+    # Staff Dashboard and Functionality
+    path('staff/dashboard/', staff_views.StaffDashboardView.as_view(), name='staff_dashboard'),
+    path('staff/orders/', staff_views.StaffOrdersView.as_view(), name='staff_orders'),
+    path('staff/orders/<str:order_number>/', staff_views.StaffOrderDetailView.as_view(), name='staff_order_detail'),
+    
+    # API endpoints for order management
+    path('api/staff/update-order-status/', staff_views.StaffUpdateOrderStatusView.as_view(), name='staff_update_order_status'),
+    path('api/staff/assign-delivery/', staff_views.StaffAssignDeliveryAgentView.as_view(), name='staff_assign_delivery'),
+    path('api/assign-order-to-staff/', staff_views.AssignOrderToStaffView.as_view(), name='assign_order_to_staff'),
+    path('api/staff/update-order-status/', staff_views.StaffUpdateOrderStatusView.as_view(), name='staff_update_order_status'),
+    path('api/assign-order-to-staff/', staff_views.AssignOrderToStaffView.as_view(), name='assign_order_to_staff'),
     
     # Additional store management URLs
     path('profile/', views_additional.store_profile, name='store_profile'),
@@ -53,6 +75,5 @@ urlpatterns = [
     path('api/check-availability/', views.CheckAvailabilityView.as_view(), name='check_availability'),
     path('api/update-inventory/', views.UpdateInventoryView.as_view(), name='update_inventory'),
     path('api/new-orders-count/', views.new_orders_count, name='new_orders_count'),
-    path('api/update-order-status/', views.update_order_status, name='update_order_status'),
     path('api/toggle-store-status/', views.toggle_store_status, name='toggle_store_status'),
 ]

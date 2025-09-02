@@ -78,6 +78,15 @@ class OrderStatusService:
             # Save the order
             order.save()
             
+            # Handle automatic agent assignment for packed orders
+            if new_status == 'packed':
+                assignment = cls._auto_assign_delivery_agent(order)
+                if assignment:
+                    # If agent was assigned, update status to ready_for_pickup
+                    order.status = 'ready_for_pickup'
+                    order.save()
+                    logger.info(f"Order {order.order_number} auto-transitioned to ready_for_pickup after agent assignment")
+            
             # Create status history record
             if updated_by:
                 OrderStatusHistory.objects.create(
@@ -106,35 +115,62 @@ class OrderStatusService:
     
     @classmethod
     def get_next_possible_statuses(cls, current_status):
-        """Get list of possible next statuses"""
-        return cls.VALID_TRANSITIONS.get(current_status, [])
+        """Get list of possible next statuses with display names"""
+        next_status_codes = cls.VALID_TRANSITIONS.get(current_status, [])
+        
+        # Import Order model to get status choices
+        from .models import Order
+        status_choices = dict(Order.ORDER_STATUS)
+        
+        # Return tuples of (status_code, display_name)
+        return [(status, status_choices.get(status, status)) for status in next_status_codes]
     
     @classmethod
     def _trigger_status_notifications(cls, order, old_status, new_status):
         """Trigger notifications for status changes"""
         # Import here to avoid circular imports
-        from core.services_notifications import NotificationService
+        from core.services_notifications import PushNotificationService
         
         try:
             # Customer notifications
             if new_status in ['confirmed', 'preparing', 'packed', 'out_for_delivery', 'delivered']:
-                NotificationService.notify_order_status_change(
-                    user=order.user,
-                    order=order,
-                    old_status=old_status,
-                    new_status=new_status
-                )
-            
+                # Use PushNotificationService instead of NotificationService
+                # For now, we'll log the notification - can be enhanced later
+                logger.info(f"Status change notification: Order {order.order_number} status changed from {old_status} to {new_status}")
+                
             # Store notifications
             if new_status in ['placed', 'cancelled']:
-                NotificationService.notify_store_order_update(
-                    store=order.store,
-                    order=order,
-                    status=new_status
-                )
-            
+                logger.info(f"Store notification: Order {order.order_number} status changed from {old_status} to {new_status}")
+                
         except Exception as e:
             logger.warning(f"Failed to send notifications for order {order.order_number}: {str(e)}")
+    
+    @classmethod
+    def _auto_assign_delivery_agent(cls, order):
+        """Automatically assign delivery agent when order is packed"""
+        try:
+            # Import here to avoid circular imports
+            from delivery.services import DeliveryAssignmentService
+            from delivery.models import DeliveryAssignment
+            
+            # Check if already assigned (check database directly)
+            if DeliveryAssignment.objects.filter(order=order).exists():
+                logger.info(f"Order {order.order_number} already has delivery assignment")
+                return None
+                
+            # Attempt automatic assignment
+            assignment = DeliveryAssignmentService.assign_order_to_agent(order=order)
+            
+            if assignment:
+                logger.info(f"Order {order.order_number} automatically assigned to agent {assignment.agent.user.get_full_name()}")
+                return assignment
+            else:
+                logger.warning(f"Failed to automatically assign agent to order {order.order_number}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error in auto agent assignment for order {order.order_number}: {str(e)}")
+            return None
     
     @classmethod
     def get_orders_by_status(cls, status, store=None, user=None):

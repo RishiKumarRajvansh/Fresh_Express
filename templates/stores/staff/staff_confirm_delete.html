@@ -1,0 +1,113 @@
+{% extends 'stores/base_store.html' %}
+
+{% block title %}Deactivate Staff Member{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0 text-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Deactivate Staff Member
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning" role="alert">
+                        <h5 class="alert-heading">
+                            <i class="fas fa-exclamation-circle"></i> Are you sure?
+                        </h5>
+                        <p class="mb-0">
+                            You are about to deactivate the following staff member. This action will:
+                        </p>
+                        <ul class="mb-0 mt-2">
+                            <li>Prevent the staff member from logging in</li>
+                            <li>Remove access to all staff functionalities</li>
+                            <li>Keep their order history and assignments for records</li>
+                            <li>Allow you to reactivate them later if needed</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Staff Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title">Staff Member Details</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Staff ID:</strong> {{ object.staff_id }}</p>
+                                            <p><strong>Full Name:</strong> {{ object.user.get_full_name|default:object.user.username }}</p>
+                                            <p><strong>Email:</strong> {{ object.user.email }}</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>Role:</strong> {{ object.get_role_display }}</p>
+                                            <p><strong>Phone:</strong> {{ object.phone_number|default:"Not provided" }}</p>
+                                            <p><strong>Current Status:</strong> 
+                                                <span class="badge bg-{{ object.is_active|yesno:'success,danger' }}">
+                                                    {{ object.is_active|yesno:'Active,Inactive' }}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Current Assignments Warning -->
+                    {% if object.assigned_orders.exists %}
+                    <div class="alert alert-info" role="alert">
+                        <h6 class="alert-heading">
+                            <i class="fas fa-info-circle"></i> Current Order Assignments
+                        </h6>
+                        <p class="mb-2">This staff member has {{ object.assigned_orders.count }} active order assignment(s).</p>
+                        <p class="mb-0"><strong>Note:</strong> Deactivating this staff member will not affect existing order assignments, but they will no longer be able to access or update these orders.</p>
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post" class="d-inline">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-user-times"></i> Yes, Deactivate Staff Member
+                                </button>
+                                <a href="{% url 'stores:staff_detail' object.pk %}" class="btn btn-secondary">
+                                    <i class="fas fa-edit"></i> Edit Instead
+                                </a>
+                            </div>
+                            <a href="{% url 'stores:staff_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Staff List
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Add confirmation dialog for the deactivate button
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const confirmed = confirm(
+                'Are you absolutely sure you want to deactivate this staff member?\n\n' +
+                'Staff ID: {{ object.staff_id }}\n' +
+                'Name: {{ object.user.get_full_name|default:object.user.username }}\n\n' +
+                'This action will prevent them from logging in immediately.'
+            );
+            
+            if (!confirmed) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

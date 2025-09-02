@@ -1,18 +1,19 @@
-{% extends 'base_mobile.html' %}
+{% extends 'stores/base.html' %}
 
 {% block title %}Order #{{ order.order_number }} - Store Management{% endblock %}
 
 {% block extra_css %}
+{{ block.super }}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 {% endblock %}
 
-{% block content %}
+{% block store_content %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-12">
             <!-- Back Button -->
             <div class="mb-3">
-                <a href="{% url 'stores:orders_management' %}" class="btn btn-outline-secondary btn-sm">
+                <a href="{% url 'stores:orders' %}" class="btn btn-outline-secondary btn-sm">
                     <i class="fas fa-arrow-left me-2"></i>Back to Orders
                 </a>
             </div>
@@ -156,9 +157,9 @@
                     <div class="row">
                         <div class="col-md-6">
                             <h6>Update Order Status</h6>
-                            <form method="post" action="{% url 'stores:update_order_status' %}" id="updateStatusForm">
+                            <form method="post" action="{% url 'stores:update_order_status' order.order_number %}" id="updateStatusForm">
                                 {% csrf_token %}
-                                <input type="hidden" name="order_id" value="{{ order.id }}">
+                                <input type="hidden" name="order_number" value="{{ order.order_number }}">
                                 <div class="mb-3">
                                     <label for="status" class="form-label">New Status:</label>
                                     <select name="status" id="status" class="form-select">
@@ -215,6 +216,90 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Staff Assignment -->
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-user-friends me-2"></i>Staff Assignment</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.staff_assignment %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Currently Assigned To</h6>
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="fas fa-user-circle fa-2x text-primary me-3"></i>
+                                <div>
+                                    <strong>{{ order.staff_assignment.staff.user.get_full_name }}</strong>
+                                    <br><small class="text-muted">{{ order.staff_assignment.staff.get_role_display }} • ID: {{ order.staff_assignment.staff.staff_id }}</small>
+                                </div>
+                            </div>
+                            <p><strong>Assignment Status:</strong> 
+                                <span class="badge 
+                                    {% if order.staff_assignment.status == 'assigned' %}bg-warning
+                                    {% elif order.staff_assignment.status == 'accepted' %}bg-info
+                                    {% elif order.staff_assignment.status == 'in_progress' %}bg-primary
+                                    {% elif order.staff_assignment.status == 'packed' %}bg-success
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ order.staff_assignment.get_status_display }}
+                                </span>
+                            </p>
+                            <p class="text-muted"><small>Assigned: {{ order.staff_assignment.assigned_at|date:"M d, Y H:i" }}</small></p>
+                            {% if order.staff_assignment.notes %}
+                            <p><strong>Notes:</strong><br>{{ order.staff_assignment.notes }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Reassign to Different Staff</h6>
+                            <form id="reassignStaffForm">
+                                <input type="hidden" name="order_id" value="{{ order.id }}">
+                                <div class="mb-3">
+                                    <select name="staff_id" class="form-select" required>
+                                        <option value="">Select Staff Member...</option>
+                                        {% for staff in available_staff %}
+                                        <option value="{{ staff.id }}" {% if staff.id == order.staff_assignment.staff.id %}selected{% endif %}>
+                                            {{ staff.user.get_full_name }} ({{ staff.get_role_display }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-exchange-alt me-2"></i>Reassign
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-user-plus fa-2x text-muted"></i>
+                            <h6 class="text-muted mt-2">No Staff Assigned</h6>
+                            <p class="text-muted">Assign this order to a staff member for processing</p>
+                        </div>
+                        <form id="assignStaffForm">
+                            <input type="hidden" name="order_id" value="{{ order.id }}">
+                            <div class="row justify-content-center">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <select name="staff_id" class="form-select" required>
+                                            <option value="">Select Staff Member...</option>
+                                            {% for staff in available_staff %}
+                                            <option value="{{ staff.id }}">
+                                                {{ staff.user.get_full_name }} ({{ staff.get_role_display }})
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-user-plus me-2"></i>Assign to Staff
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -332,8 +417,8 @@ function updateOrderStatus(status) {
 
     const csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
     const csrfToken = (csrfEl && csrfEl.value) || getCookie('csrftoken') || '{{ csrf_token }}';
-    // Debug: log outgoing request details
-    try { console.debug('updateOrderStatus ->', { action: form.action, order_id: formData.get('order_id'), status: formData.get('status'), csrfToken: csrfToken ? '[present]' : '[missing]' }); } catch(e){}
+    // Log request details for monitoring
+    try { console.log('updateOrderStatus ->', { action: form.action, order_id: formData.get('order_id'), status: formData.get('status'), csrfToken: csrfToken ? '[present]' : '[missing]' }); } catch(e){}
 
     fetch(form.action, {
         method: 'POST',
@@ -346,19 +431,15 @@ function updateOrderStatus(status) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-                        // show success in debug panel and reload
-                        const dbg = document.getElementById('ajaxDebug');
-                        if (dbg) dbg.textContent = JSON.stringify(data);
-                        setTimeout(() => location.reload(), 800);
+            showStatusMessage('Order status updated successfully!', 'success');
+            setTimeout(() => location.reload(), 800);
         } else {
-            const dbg = document.getElementById('ajaxDebug');
-            if (dbg) dbg.textContent = JSON.stringify(data);
+            showStatusMessage(data.error || 'Failed to update status', 'error');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        const dbg = document.getElementById('ajaxDebug');
-        if (dbg) dbg.textContent = String(error);
+        showStatusMessage('Network error occurred', 'error');
     });
 }
 
@@ -408,26 +489,81 @@ document.getElementById('updateStatusForm').addEventListener('submit', function(
     });
 });
 
-// Visible debug panel so store managers can copy the last AJAX response
-(function createDebugPanel(){
-    try{
-        var dbg = document.createElement('pre');
-        dbg.id = 'ajaxDebug';
-        dbg.style.position = 'fixed';
-        dbg.style.right = '10px';
-        dbg.style.bottom = '10px';
-        dbg.style.background = 'rgba(0,0,0,0.9)';
-        dbg.style.color = '#fff';
-        dbg.style.padding = '8px';
-        dbg.style.zIndex = '99999';
-        dbg.style.maxWidth = '400px';
-        dbg.style.maxHeight = '200px';
-        dbg.style.overflow = 'auto';
-        dbg.style.fontSize = '12px';
-        dbg.style.borderRadius = '6px';
-        dbg.textContent = 'AJAX debug panel: awaiting actions...';
-        document.body.appendChild(dbg);
-    }catch(e){}
-})();
+// Production ready - debug panel removed
+
+// Status message function
+function showStatusMessage(message, type = 'info') {
+    const alertClass = type === 'success' ? 'alert-success' : type === 'error' ? 'alert-danger' : 'alert-info';
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Staff Assignment Functions
+document.getElementById('assignStaffForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    fetch("{% url 'stores:assign_order_to_staff' %}", {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showStatusMessage('Order assigned to staff successfully!', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showStatusMessage(data.error || 'Failed to assign order to staff', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showStatusMessage('Network error occurred', 'error');
+    });
+});
+
+document.getElementById('reassignStaffForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    fetch("{% url 'stores:assign_order_to_staff' %}", {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showStatusMessage('Order reassigned successfully!', 'success');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            showStatusMessage(data.error || 'Failed to reassign order', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showStatusMessage('Network error occurred', 'error');
+    });
+});
 </script>
 {% endblock %}

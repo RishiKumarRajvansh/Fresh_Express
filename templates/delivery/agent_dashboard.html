@@ -54,6 +54,12 @@
         border-color: #f44336;
     }
     
+    .nav-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        filter: brightness(110%);
+    }
+    
     .stats-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -383,6 +389,24 @@
                         onclick="toggleAvailability()">
                     {% if agent.is_available %}ONLINE{% else %}OFFLINE{% endif %}
                 </button>
+            </div>
+        </div>
+
+        <!-- Navigation Menu -->
+        <div class="navigation-menu" style="margin-bottom: 30px;">
+            <div class="nav-links" style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;">
+                <a href="{% url 'delivery:agent_dashboard' %}" class="nav-btn" style="background: var(--appetite-red); color: white; padding: 12px 20px; border-radius: 25px; text-decoration: none; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;">
+                    📊 Dashboard
+                </a>
+                <a href="{% url 'delivery:agent_orders' %}" class="nav-btn" style="background: var(--fresh-orange); color: white; padding: 12px 20px; border-radius: 25px; text-decoration: none; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;">
+                    📦 My Orders
+                </a>
+                <a href="{% url 'delivery:earnings' %}" class="nav-btn" style="background: var(--golden-spice); color: white; padding: 12px 20px; border-radius: 25px; text-decoration: none; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;">
+                    💰 Earnings
+                </a>
+                <a href="{% url 'delivery:agent_profile_new' %}" class="nav-btn" style="background: var(--meat-burgundy); color: white; padding: 12px 20px; border-radius: 25px; text-decoration: none; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease;">
+                    👤 Profile
+                </a>
             </div>
         </div>
 

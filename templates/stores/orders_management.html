@@ -1,9 +1,9 @@
-{% extends 'base_mobile.html' %}
+{% extends 'stores/base.html' %}
 {% load static %}
 
 {% block title %}Orders - {{ store.name }}{% endblock %}
 
-{% block content %}
+{% block store_content %}
 <div class="container py-3">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="h4 mb-0">
@@ -23,19 +23,19 @@
             <div class="row">
                 <div class="col-md-8">
                     <div class="btn-group" role="group">
-                        <a href="{% url 'stores:orders_management' %}" 
+                        <a href="{% url 'stores:orders' %}" 
                            class="btn {% if not status_filter %}btn-primary{% else %}btn-outline-primary{% endif %}">
                             All Orders
                         </a>
-                        <a href="{% url 'stores:orders_management' %}?status=pending" 
+                        <a href="{% url 'stores:orders' %}?status=pending" 
                            class="btn {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
                             Pending
                         </a>
-                        <a href="{% url 'stores:orders_management' %}?status=confirmed" 
+                        <a href="{% url 'stores:orders' %}?status=confirmed" 
                            class="btn {% if status_filter == 'confirmed' %}btn-info{% else %}btn-outline-info{% endif %}">
                             Confirmed
                         </a>
-                        <a href="{% url 'stores:orders_management' %}?status=delivered" 
+                        <a href="{% url 'stores:orders' %}?status=delivered" 
                            class="btn {% if status_filter == 'delivered' %}btn-success{% else %}btn-outline-success{% endif %}">
                             Delivered
                         </a>
@@ -76,18 +76,18 @@
                         </p>
                         
                         <div class="d-flex gap-2">
-                            <a href="{% url 'stores:order_detail' order.id %}" 
+                            <a href="{% url 'stores:order_detail' order.order_number %}" 
                                class="btn btn-sm btn-primary">
                                 <i class="fas fa-eye me-1"></i>View Details
                             </a>
                             
                             {% if order.status == 'pending' %}
                                 <button class="btn btn-sm btn-success" 
-                                        onclick="updateStatus({{ order.id }}, 'confirmed')">
+                                        onclick="updateStatus('{{ order.order_number }}', 'confirmed')">
                                     <i class="fas fa-check me-1"></i>Confirm
                                 </button>
                                 <button class="btn btn-sm btn-danger" 
-                                        onclick="updateStatus({{ order.id }}, 'cancelled')">
+                                        onclick="updateStatus('{{ order.order_number }}', 'cancelled')">
                                     <i class="fas fa-times me-1"></i>Cancel
                                 </button>
                             {% elif order.status == 'confirmed' %}
@@ -125,9 +125,9 @@
 </div>
 
 <script>
-function updateStatus(orderId, status) {
+function updateStatus(orderNumber, status) {
     if (confirm(`Update order status to ${status}?`)) {
-        fetch('{% url "stores:update_order_status" %}', {
+        fetch(`{% url "stores:update_order_status" "PLACEHOLDER" %}`.replace('PLACEHOLDER', orderNumber), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
