@@ -346,7 +346,15 @@ self.addEventListener('push', event => {
   };
   
   event.waitUntil(
-    self.registration.
+    (async () => {
+      try {
+        await self.registration.showNotification(data.title || 'Fresh Express', options);
+      } catch (err) {
+        console.error('Failed to show push notification:', err);
+      }
+    })()
+  );
+
 });
 
 // Notification click handling

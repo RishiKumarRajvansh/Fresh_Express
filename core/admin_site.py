@@ -16,7 +16,7 @@ from locations.models import ZipArea
 User = get_user_model()
 
 class ModernAdminSite(admin.AdminSite):
-    site_header = "🥩 Fresh Meat & Seafood Admin"
+    site_header = "🥩 Fresh Express Admin"
     site_title = "Admin Portal"
     index_title = "Management Dashboard"
     

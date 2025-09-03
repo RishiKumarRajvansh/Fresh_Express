@@ -36,7 +36,7 @@ class PushNotificationService:
         self.vapid_private_key = getattr(settings, 'VAPID_PRIVATE_KEY', None)
         self.vapid_public_key = getattr(settings, 'VAPID_PUBLIC_KEY', None)
         self.vapid_claims = getattr(settings, 'VAPID_CLAIMS', {
-            'sub': 'mailto:admin@freshmeat.com'
+            'sub': 'mailto:admin@freshexpress.com'
         })
         
         if not all([self.vapid_private_key, self.vapid_public_key]):

@@ -1,4 +1,4 @@
-// Main JavaScript for FreshMeat Platform
+// Main JavaScript for Fresh Express Platform
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tooltips and popovers
@@ -495,26 +495,39 @@ function getCookie(name) {
     return cookieValue;
 }
 
-function {
-    const alertClass = type === 'error' ? 'alert-danger' : 
-                     type === 'success' ? 'alert-success' : 
-                     type === 'warning' ? 'alert-warning' : 'alert-info';
-    
+function showNotification(message, type = 'info') {
+    const alertClass = type === 'error' ? 'alert-danger' :
+                       type === 'success' ? 'alert-success' :
+                       type === 'warning' ? 'alert-warning' : 'alert-info';
+
     const notification = document.createElement('div');
     notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
     notification.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px;';
     notification.innerHTML = `
         ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     // Auto-dismiss after 5 seconds
     setTimeout(() => {
         if (notification.parentNode) {
-            const bsAlert = new bootstrap.Alert(notification);
-            bsAlert.close();
+            // Safely try to use Bootstrap Alert API if available
+            try {
+                if (window.bootstrap && bootstrap.Alert) {
+                    const bsAlert = new bootstrap.Alert(notification);
+                    if (bsAlert && typeof bsAlert.close === 'function') {
+                        bsAlert.close();
+                        return;
+                    }
+                }
+            } catch (e) {
+                // ignore and fallback to DOM removal
+            }
+
+            // Fallback removal
+            notification.remove();
         }
     }, 5000);
 }
